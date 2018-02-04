@@ -1,5 +1,5 @@
 # mini-metrics
-
+```
 Usage of ./mini-metrics:
   -alsologtostderr
     	log to standard error as well as files
@@ -23,3 +23,4 @@ Usage of ./mini-metrics:
     	log level for V logs
   -vmodule value
     	comma-separated list of pattern=N settings for file-filtered logging
+```
