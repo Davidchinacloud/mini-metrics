@@ -1,6 +1,7 @@
 package collectors
 
 import (
+	"fmt"
 	"log"
 	
 	"github.com/prometheus/client_golang/prometheus"
@@ -33,6 +34,7 @@ func (s *ServiceCollector) collectorList() []prometheus.Collector {
 }
 
 func (s *ServiceCollector)collect()error{
+	fmt.Printf("collect...\n")
 	var status float64
 	status = 1
 	s.Status.WithLabelValues("node1234").Set(status)

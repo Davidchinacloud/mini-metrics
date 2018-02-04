@@ -14,6 +14,10 @@ import (
 	"github.com/sak0/mini-metrics/collectors"
 )
 
+const (
+	healthzPath = "/healthz"
+)
+
 var (
 	interval 	= flag.Duration("interval", 3 * time.Second, "How long collector interval.")
 	port	 	= flag.String("port", "9090", "metrics listen port.")
@@ -72,6 +76,10 @@ func main(){
 			<p><a href='` + *metricsPath + `'>Metrics</a></p>
 			</body>
 			</html>`))
+	})
+	http.HandleFunc(healthzPath, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte("ok"))
 	})
 	log.Fatal(http.ListenAndServe("0.0.0.0:9090", nil))
 }
