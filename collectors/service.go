@@ -43,7 +43,11 @@ func RegisterServiceCollector(registry prometheus.Registerer, kubeClient kuberne
 		return pods, nil
 	})
 
-	registry.MustRegister(newServiceCollector(podLister))
+	//registry.MustRegister()
+	fmt.Printf("just log for use var registry %v\n", registry)
+	
+	prometheus.Register(newServiceCollector(podLister))
+	
 	go pinf.Run(context.Background().Done())
 }
 
@@ -72,7 +76,7 @@ func (s *ServiceCollector) collectorList() []prometheus.Collector {
 }
 
 func (s *ServiceCollector)collect()error{
-	fmt.Printf("collect at %v\n", time.Now())
+	fmt.Printf("Collect at %v\n", time.Now())
 	var status float64
 	status = 1
 	s.Status.WithLabelValues("node1234").Set(status)
@@ -84,7 +88,7 @@ func (s *ServiceCollector)collect()error{
 	}
 	
 	for _, pod := range pods {
-		fmt.Printf("[pod] %v\n", pod)
+		fmt.Printf("[pod] %v\n", pod.Status)
 	}
 	
 	return nil
