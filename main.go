@@ -5,8 +5,12 @@ import (
 	"flag"
 	"log"
 	"net/http"
-	"sync"
 	"time"
+	
+	"github.com/golang/glog"
+	clientset "k8s.io/client-go/kubernetes"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
 	
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -22,9 +26,15 @@ var (
 	interval 	= flag.Duration("interval", 3 * time.Second, "How long collector interval.")
 	port	 	= flag.String("port", "9090", "metrics listen port.")
 	metricsPath = flag.String("metrics-path", "/metrics", "metrcis url path.")
+	namespace	= flag.String("namespace", metav1.NamespaceAll, "namespace to be enabled for monitoring")
+	
+	defaultCollectors = []string{"services"}
+	availableCollectors = map[string]func(registry prometheus.Registerer, kubeClient clientset.Interface, namespace string){
+		"services":                 collectors.RegisterServiceCollector,
+	}	
 )
 
-type MiniExporter struct {
+/*type MiniExporter struct {
 	mu	sync.Mutex
 	collectors []prometheus.Collector
 }
@@ -46,12 +56,40 @@ func (c *MiniExporter) Describe(ch chan<- *prometheus.Desc) {
 func (c *MiniExporter) Collect(ch chan<- prometheus.Metric) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	fmt.Printf("Collect at %v\n", time.Now())
 
 	for _, cc := range c.collectors {
 		cc.Collect(ch)
 	}
-}
+}*/
 
+func registerCollectors(registry prometheus.Registerer, 
+	kubeClient clientset.Interface, collectors []string, namespace string){
+		for _, c := range collectors{
+			if f, ok := availableCollectors[c]; !ok {
+				glog.Warningf("Collector %s is not available", c)
+			} else {
+				f(registry, kubeClient, namespace)
+			}
+		}
+	}
+
+func createKubenetesClient()(kubeClient clientset.Interface, err error){
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, err
+	}
+	if kubeClient, err = clientset.NewForConfig(config); err != nil {
+		return nil, err
+	}
+	v, err := kubeClient.Discovery().ServerVersion()
+	if err != nil {
+		return nil, fmt.Errorf("ERROR communicating with apiserver: %v", err)
+	}
+	glog.Infof("Running with Kubernetes cluster version: v%s.%s. git version: %s. git tree state: %s. commit: %s. platform: %s",
+		v.Major, v.Minor, v.GitVersion, v.GitTreeState, v.GitCommit, v.Platform)
+	return kubeClient, nil
+}
 	
 func main(){
 	fmt.Printf("Mini Metrics Server.\n")
@@ -61,10 +99,19 @@ func main(){
 	//m := metrics.NewMetrics("123", *interval)
 	//http.ListenAndServe("127.0.0.1:9090", m)
 	
-	err := prometheus.Register(NewMiniExporter())
+	kubeClient, err := createKubenetesClient()
+	if err != nil {
+		glog.Errorf("Can't create kubeneres client: %v\n", err)
+		return
+	}
+	
+	registry := prometheus.NewRegistry()
+	registerCollectors(registry, kubeClient, defaultCollectors, *namespace)
+	
+	/*err := prometheus.Register(NewMiniExporter())
 	if err != nil {
 		log.Fatalf("cannot export service error: %v", err)
-	}
+	}*/
 	
 	
 	http.Handle(*metricsPath, promhttp.Handler())
