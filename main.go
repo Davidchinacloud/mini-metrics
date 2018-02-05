@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"flag"
 	"log"
+	"net"
 	"net/http"
 	"time"
+	"strconv"
 	
 	"github.com/golang/glog"
 	clientset "k8s.io/client-go/kubernetes"
@@ -24,7 +26,7 @@ const (
 
 var (
 	interval 	= flag.Duration("interval", 3 * time.Second, "How long collector interval.")
-	port	 	= flag.String("port", "9090", "metrics listen port.")
+	port	 	= flag.Int("port", 9090, "metrics listen port.")
 	metricsPath = flag.String("metrics-path", "/metrics", "metrcis url path.")
 	namespace	= flag.String("namespace", metav1.NamespaceAll, "namespace to be enabled for monitoring")
 	
@@ -128,5 +130,7 @@ func main(){
 		w.WriteHeader(200)
 		w.Write([]byte("ok"))
 	})
-	log.Fatal(http.ListenAndServe("0.0.0.0:9090", nil))
+	
+	listenAddress := net.JoinHostPort("0.0.0.0", strconv.Itoa(*port))
+	log.Fatal(http.ListenAndServe(listenAddress, nil))
 }
