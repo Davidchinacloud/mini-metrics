@@ -34,10 +34,20 @@ type deploymentStore interface {
 	List() (deployments []v1beta1.Deployment, err error)
 }
 
+type ReplicaSetLister func() ([]v1beta1.ReplicaSet, error)
+func (l ReplicaSetLister) List() ([]v1beta1.ReplicaSet, error) {
+	return l()
+}
+type replicasetStore interface {
+	List() (replicasets []v1beta1.ReplicaSet, err error)
+}
+
+
 type ServiceCollector struct {
 	Status		*prometheus.GaugeVec
 	pStore		podStore
 	dStore		deploymentStore
+	rStore      replicasetStore
 }
 
 
@@ -67,14 +77,25 @@ func RegisterServiceCollector(registry prometheus.Registerer, kubeClient kuberne
 		}
 		return deployments, nil
 	})
+	
+	glog.Infof("collect replicaset with %s", client.APIVersion())
+	rslw := cache.NewListWatchFromClient(client, "replicasets", namespace, fields.Everything())
+	rsinf := cache.NewSharedInformer(rslw, &v1beta1.ReplicaSet{}, resyncPeriod)
+	replicaSetLister := ReplicaSetLister(func() (replicasets []v1beta1.ReplicaSet, err error) {
+		for _, c := range rsinf.GetStore().List() {
+			replicasets = append(replicasets, *(c.(*v1beta1.ReplicaSet)))
+		}
+		return replicasets, nil
+	})
 
-	prometheus.Register(newServiceCollector(podLister, dplLister))
+	prometheus.Register(newServiceCollector(podLister, dplLister, replicaSetLister))
 	go pinf.Run(context.Background().Done())
 	go dinf.Run(context.Background().Done())
+	go rsinf.Run(context.Background().Done())
 }
 
 
-func newServiceCollector(ps podStore, ds deploymentStore)*ServiceCollector{
+func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore)*ServiceCollector{
 	labels := make(prometheus.Labels)
 
 	return &ServiceCollector{
@@ -89,6 +110,7 @@ func newServiceCollector(ps podStore, ds deploymentStore)*ServiceCollector{
 		),
 		pStore: ps,
 		dStore: ds,
+		rStore: rs,
 	}
 }
 
@@ -113,10 +135,11 @@ func (s *ServiceCollector)displayDeployment(dl v1beta1.Deployment){
 	glog.V(3).Infof("*****************************")
 	glog.V(5).Infof("[DEPLOYMENT]%v", dl)
 	glog.V(3).Infof("Deployment[%s] || %s", dl.Name, dl.Namespace)
-	glog.V(3).Infof("Replicas: %s", dl.Spec.Replicas)
+	glog.V(3).Infof("Replicas: %d", *dl.Spec.Replicas)
 	glog.V(3).Infof("ReadyReplicas: %d", dl.Status.ReadyReplicas)
 	glog.V(3).Infof("AvailableReplicas: %d", dl.Status.AvailableReplicas)
 	glog.V(3).Infof("UnavailableReplicas: %d", dl.Status.UnavailableReplicas)
+	glog.V(5).Infof("PodTemplate: %#v", dl.Spec.Template)
 	glog.V(3).Infof("*****************************")
 }
 
