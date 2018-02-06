@@ -57,6 +57,7 @@ func RegisterServiceCollector(registry prometheus.Registerer, kubeClient kuberne
 		return pods, nil
 	})
 	
+	client = kubeClient.ExtensionsV1beta1().RESTClient()
 	glog.Infof("collect deployment with %s", client.APIVersion())
 	dlw := cache.NewListWatchFromClient(client, "deployments", namespace, fields.Everything())
 	dinf := cache.NewSharedInformer(dlw, &v1beta1.Deployment{}, resyncPeriod)
