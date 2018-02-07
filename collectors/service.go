@@ -106,7 +106,7 @@ func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore)*Se
 				Help:        "TEST FOR SERVICE STATUS",
 				ConstLabels: labels,
 			},
-			[]string{"service"},
+			[]string{"service_name", "host"},
 		),
 		pStore: ps,
 		dStore: ds,
@@ -143,13 +143,24 @@ func (s *ServiceCollector)displayDeployment(dl v1beta1.Deployment){
 	glog.V(3).Infof("*****************************")
 }
 
+func (s *ServiceCollector)displayReplicaSet(rs v1beta1.ReplicaSet){
+	glog.V(3).Infof("*****************************")
+	glog.V(5).Infof("[ReplicaSet]%v", rs)
+	glog.V(3).Infof("ReplicaSet[%s] || %s", rs.Name, rs.Namespace)
+	glog.V(3).Infof("Replicas: %d", rs.Status.Replicas)
+	glog.V(3).Infof("ReadyReplicas: %d", rs.Status.ReadyReplicas)
+	glog.V(3).Infof("AvailableReplicas: %d", rs.Status.AvailableReplicas)
+	glog.V(5).Infof("Conditions: %#v", rs.Status.Conditions)
+	glog.V(3).Infof("*****************************")
+}
+
 func (s *ServiceCollector)collect()error{
 	fmt.Printf("Collect at %v\n", time.Now())
 	var status float64
 	status = 1
-	s.Status.WithLabelValues("node1234").Set(status)
+	s.Status.WithLabelValues("service-a", "node1234").Set(status)
 	status = 2
-	s.Status.WithLabelValues("node5678").Set(status)
+	s.Status.WithLabelValues("service-b", "node5678").Set(status)
 	
 	pods, err := s.pStore.List()
 	if err != nil {
@@ -167,6 +178,15 @@ func (s *ServiceCollector)collect()error{
 	} else {
 		for _, d := range deployments {
 			s.displayDeployment(d)
+		}
+	}
+	
+	replicasets, err := s.rStore.List()
+	if err != nil {
+		glog.Errorf("listing replicasets failed: %s", err)
+	} else {
+		for _, r := range replicasets {
+			s.displayReplicaSet(r)
 		}
 	}
 	
