@@ -44,10 +44,13 @@ type replicasetStore interface {
 
 
 type ServiceCollector struct {
-	Status		*prometheus.GaugeVec
-	pStore		podStore
-	dStore		deploymentStore
-	rStore      replicasetStore
+	StatusBuilding		*prometheus.GaugeVec
+	StatusFailed		*prometheus.GaugeVec
+	StatusRunning		*prometheus.GaugeVec
+	StatusStopped		*prometheus.GaugeVec
+	pStore				podStore
+	dStore				deploymentStore
+	rStore      		replicasetStore
 }
 
 
@@ -99,15 +102,42 @@ func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore)*Se
 	labels := make(prometheus.Labels)
 
 	return &ServiceCollector{
-		Status: prometheus.NewGaugeVec(
+		StatusBuilding: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace:   "mock",
-				Name:        "fast_service_status",
+				Name:        "service_status_building",
 				Help:        "TEST FOR SERVICE STATUS",
 				ConstLabels: labels,
 			},
-			[]string{"service_name", "host"},
+			[]string{"service_name", "namespace"},
 		),
+		StatusFailed: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace:   "mock",
+				Name:        "service_status_failed",
+				Help:        "TEST FOR SERVICE STATUS",
+				ConstLabels: labels,
+			},
+			[]string{"service_name", "namespace"},
+		),
+		StatusRunning: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace:   "mock",
+				Name:        "service_status_runnning",
+				Help:        "TEST FOR SERVICE STATUS",
+				ConstLabels: labels,
+			},
+			[]string{"service_name", "namespace"},
+		),
+		StatusStopped: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace:   "mock",
+				Name:        "service_status_stopped",
+				Help:        "TEST FOR SERVICE STATUS",
+				ConstLabels: labels,
+			},
+			[]string{"service_name", "namespace"},
+		),	
 		pStore: ps,
 		dStore: ds,
 		rStore: rs,
@@ -116,7 +146,10 @@ func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore)*Se
 
 func (s *ServiceCollector) collectorList() []prometheus.Collector {
 	return []prometheus.Collector{
-		s.Status,
+		s.StatusBuilding,
+		s.StatusFailed,
+		s.StatusRunning,
+		s.StatusStopped,
 	}
 }
 
@@ -154,13 +187,20 @@ func (s *ServiceCollector)displayReplicaSet(rs v1beta1.ReplicaSet){
 	glog.V(3).Infof("*****************************")
 }
 
+func (s *ServiceCollector)setValue(name string, namespace string){
+	s.StatusRunning.WithLabelValues(name, namespace).Set(1)
+	s.StatusBuilding.WithLabelValues(name, namespace).Set(1)
+	s.StatusFailed.WithLabelValues(name, namespace).Set(1)
+	s.StatusStopped.WithLabelValues(name, namespace).Set(1)
+}
+
 func (s *ServiceCollector)collect()error{
 	fmt.Printf("Collect at %v\n", time.Now())
-	var status float64
+	/*var status float64
 	status = 1
 	s.Status.WithLabelValues("service-a", "node1234").Set(status)
 	status = 2
-	s.Status.WithLabelValues("service-b", "node5678").Set(status)
+	s.Status.WithLabelValues("service-b", "node5678").Set(status)*/
 	
 	pods, err := s.pStore.List()
 	if err != nil {
@@ -178,6 +218,7 @@ func (s *ServiceCollector)collect()error{
 	} else {
 		for _, d := range deployments {
 			s.displayDeployment(d)
+			s.setValue(d.Name, d.Namespace)
 		}
 	}
 	
