@@ -24,3 +24,10 @@ Usage of ./mini-metrics:
   -vmodule value
     	comma-separated list of pattern=N settings for file-filtered logging
 ```
+
+#How to build
+```
+git clone git@github.com:sak0/mini-metrics.git
+CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"'
+docker build .
+```
