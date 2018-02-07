@@ -1,4 +1,9 @@
 # mini-metrics
+
+# Architecture
+![mini-metrics](./docs/mini-metrics.png)
+
+# Usage
 ```
 Usage of ./mini-metrics:
   -alsologtostderr
@@ -25,7 +30,7 @@ Usage of ./mini-metrics:
     	comma-separated list of pattern=N settings for file-filtered logging
 ```
 
-#How to build
+# How to build
 ```
 git clone git@github.com:sak0/mini-metrics.git
 CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"'
