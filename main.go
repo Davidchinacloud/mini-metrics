@@ -26,7 +26,7 @@ const (
 
 var (
 	interval 	= flag.Duration("interval", 3 * time.Second, "How long collector interval.")
-	port	 	= flag.Int("port", 9090, "metrics listen port.")
+	port	 	= flag.Int("port", 8080, "metrics listen port.")
 	metricsPath = flag.String("metrics-path", "/metrics", "metrcis url path.")
 	namespace	= flag.String("namespace", metav1.NamespaceAll, "namespace to be enabled for monitoring")
 	
