@@ -26,4 +26,8 @@ spec:
             port: 8080
           initialDelaySeconds: 5
           timeoutSeconds: 5
-
+        command:
+          - /mini-metrics
+          - -alsologtostderr
+          - -v
+          - "3"
