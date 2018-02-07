@@ -15,7 +15,14 @@ import (
 )
 
 var (
-	resyncPeriod = 15 * time.Second
+	resyncPeriod = 10 * time.Minute
+)
+
+const (
+	statusBuilding = iota
+	statusFailed
+	statusRunning
+	statusStopped
 )
 
 type PodLister func() ([]v1.Pod, error)
@@ -52,7 +59,6 @@ type ServiceCollector struct {
 	dStore				deploymentStore
 	rStore      		replicasetStore
 }
-
 
 func RegisterServiceCollector(registry prometheus.Registerer, kubeClient kubernetes.Interface, 
 	namespace string) {
@@ -187,10 +193,71 @@ func (s *ServiceCollector)displayReplicaSet(rs v1beta1.ReplicaSet){
 	glog.V(3).Infof("*****************************")
 }
 
-func (s *ServiceCollector)setValue(name string, namespace string){
+func (s *ServiceCollector)calculateStatus(rs v1beta1.ReplicaSet)int{
+	if rs.Status.AvailableReplicas == rs.Status.Replicas {
+		return statusRunning
+	}
+	if rs.Status.ReadyReplicas < *rs.Spec.Replicas {
+		return statusFailed
+	}
+	if *rs.Spec.Replicas == 0 {
+		return statusStopped
+	}
+	return 	statusBuilding
+}
+
+func (s *ServiceCollector)calculateSetValue(){
+	replicasets, err := s.rStore.List()
+	if err != nil {
+		glog.Errorf("listing replicasets failed: %s", err)
+	} else {
+		for _, r := range replicasets {
+			status := s.calculateStatus(r)
+			s.setStatus(r.Name, r.Namespace, status)
+		}
+	}
+}
+
+func (s *ServiceCollector)setStatus(name string, namespace string, status int){
+	switch status {
+		case statusBuilding:
+			s.setValueBuilding(name, namespace)
+		case statusRunning:
+			s.setValueRunning(name, namespace)
+		case statusFailed:
+			s.setValueFailed(name, namespace)
+		case statusStopped:
+			s.setValueStopped(name, namespace)
+		default:
+			glog.Warningf("Unknow status: %d\n", status)
+	}
+}
+
+func (s *ServiceCollector)setValueRunning(name string, namespace string){
 	s.StatusRunning.WithLabelValues(name, namespace).Set(1)
-	s.StatusBuilding.WithLabelValues(name, namespace).Set(1)
+	s.StatusBuilding.WithLabelValues(name, namespace).Set(0)
+	s.StatusFailed.WithLabelValues(name, namespace).Set(0)
+	s.StatusStopped.WithLabelValues(name, namespace).Set(0)
+}
+
+func (s *ServiceCollector)setValueFailed(name string, namespace string){
+	s.StatusRunning.WithLabelValues(name, namespace).Set(0)
+	s.StatusBuilding.WithLabelValues(name, namespace).Set(0)
 	s.StatusFailed.WithLabelValues(name, namespace).Set(1)
+	s.StatusStopped.WithLabelValues(name, namespace).Set(0)
+}
+
+func (s *ServiceCollector)setValueBuilding(name string, namespace string){
+	s.StatusRunning.WithLabelValues(name, namespace).Set(0)
+	s.StatusBuilding.WithLabelValues(name, namespace).Set(1)
+	s.StatusFailed.WithLabelValues(name, namespace).Set(0)
+	s.StatusStopped.WithLabelValues(name, namespace).Set(0)
+}
+
+func (s *ServiceCollector)setValueStopped(name string, namespace string){
+	s.StatusRunning.WithLabelValues(name, namespace).Set(0)
+	s.StatusBuilding.WithLabelValues(name, namespace).Set(0)
+	s.StatusFailed.WithLabelValues(name, namespace).Set(0)
 	s.StatusStopped.WithLabelValues(name, namespace).Set(1)
 }
 
@@ -218,7 +285,6 @@ func (s *ServiceCollector)collect()error{
 	} else {
 		for _, d := range deployments {
 			s.displayDeployment(d)
-			s.setValue(d.Name, d.Namespace)
 		}
 	}
 	
@@ -230,6 +296,8 @@ func (s *ServiceCollector)collect()error{
 			s.displayReplicaSet(r)
 		}
 	}
+	
+	s.calculateSetValue()
 	
 	return nil
 }
