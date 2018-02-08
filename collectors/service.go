@@ -101,6 +101,19 @@ func RegisterServiceCollector(registry prometheus.Registerer, kubeClient kuberne
 	go pinf.Run(context.Background().Done())
 	go dinf.Run(context.Background().Done())
 	go rsinf.Run(context.Background().Done())
+	
+	//just test for informer handlers
+	dinf.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(o interface{}) {
+			glog.V(5).Infof("catch AddFunc %v", o)
+		},
+		DeleteFunc: func(o interface{}) {
+			glog.V(5).Infof("catch DeleteFunc %v", o)
+		},
+		UpdateFunc: func(_, o interface{}) {
+			glog.V(5).Infof("catch UpdateFunc %v", o)
+		},
+	})
 }
 
 
