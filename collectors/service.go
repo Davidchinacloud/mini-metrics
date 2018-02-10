@@ -60,11 +60,7 @@ type ServiceCollector struct {
 	rStore      		replicasetStore
 }
 
-func RegisterServiceCollector(registry prometheus.Registerer, kubeClient kubernetes.Interface, 
-	namespace string) {
-	//registry.MustRegister()
-	fmt.Printf("just log for use var registry %v\n", registry)
-	
+func RegisterServiceCollector(kubeClient kubernetes.Interface, namespace string) {	
 	client := kubeClient.CoreV1().RESTClient()
 	glog.Infof("collect pod with %s", client.APIVersion())
 	plw := cache.NewListWatchFromClient(client, "pods", namespace, fields.Everything())
@@ -115,7 +111,6 @@ func RegisterServiceCollector(registry prometheus.Registerer, kubeClient kuberne
 		},
 	})
 }
-
 
 func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore)*ServiceCollector{
 	labels := make(prometheus.Labels)
@@ -216,7 +211,7 @@ func (s *ServiceCollector)calculateStatus(rs v1beta1.ReplicaSet)int{
 	if *rs.Spec.Replicas == 0 {
 		return statusStopped
 	}
-	return 	statusBuilding
+	return statusBuilding
 }
 
 func (s *ServiceCollector)calculateSetValue(){
@@ -331,4 +326,3 @@ func (s *ServiceCollector) Collect(ch chan<- prometheus.Metric) {
 		metric.Collect(ch)
 	}
 }
-

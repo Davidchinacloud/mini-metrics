@@ -14,7 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	
-	"github.com/prometheus/client_golang/prometheus"
+	//"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	//"github.com/sak0/mini-metrics/metrics"
 	"github.com/sak0/mini-metrics/collectors"
@@ -31,7 +31,7 @@ var (
 	namespace	= flag.String("namespace", metav1.NamespaceAll, "namespace to be enabled for monitoring")
 	
 	defaultCollectors = []string{"services"}
-	availableCollectors = map[string]func(registry prometheus.Registerer, kubeClient clientset.Interface, namespace string){
+	availableCollectors = map[string]func(kubeClient clientset.Interface, namespace string){
 		"services":                 collectors.RegisterServiceCollector,
 	}	
 )
@@ -65,13 +65,12 @@ func (c *MiniExporter) Collect(ch chan<- prometheus.Metric) {
 	}
 }*/
 
-func registerCollectors(registry prometheus.Registerer, 
-	kubeClient clientset.Interface, collectors []string, namespace string){
+func registerCollectors(kubeClient clientset.Interface, collectors []string, namespace string){
 		for _, c := range collectors{
 			if f, ok := availableCollectors[c]; !ok {
 				glog.Warningf("Collector %s is not available", c)
 			} else {
-				f(registry, kubeClient, namespace)
+				f(kubeClient, namespace)
 			}
 		}
 	}
@@ -107,8 +106,7 @@ func main(){
 		return
 	}
 	
-	registry := prometheus.NewRegistry()
-	registerCollectors(registry, kubeClient, defaultCollectors, *namespace)
+	registerCollectors(kubeClient, defaultCollectors, *namespace)
 	
 	/*err := prometheus.Register(NewMiniExporter())
 	if err != nil {
