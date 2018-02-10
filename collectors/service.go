@@ -9,6 +9,7 @@ import (
 	"k8s.io/api/extensions/v1beta1"
 	//"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
+	"sync"
 	//"k8s.io/client-go/tools/cache"
 )
 
@@ -23,29 +24,39 @@ const (
 	statusStopped
 )
 
+type StatusInfo struct {
+	name string
+	namespace string
+	status int
+}
+
 type ServiceCollector struct {
-	StatusBuilding		*prometheus.GaugeVec
-	StatusFailed		*prometheus.GaugeVec
-	StatusRunning		*prometheus.GaugeVec
-	StatusStopped		*prometheus.GaugeVec
+	fastSerivceStatus	[]*prometheus.GaugeVec
 	pStore				podStore
 	dStore				deploymentStore
 	rStore      		replicasetStore
+	statues             chan StatusInfo
+	done                chan struct{}
+	mu                  sync.Mutex
 }
 
 func RegisterServiceCollector(kubeClient kubernetes.Interface, namespace string) {
 	podLister := registerPodCollector(kubeClient, namespace)
 	dplLister := registerDeploymentCollector(kubeClient, namespace)
 	replicaSetLister := registerReplicaSetCollector(kubeClient, namespace)
-
-	prometheus.Register(newServiceCollector(podLister, dplLister, replicaSetLister))
+	sc := newServiceCollector(podLister, dplLister, replicaSetLister)
+	prometheus.Register(sc)
+	
+	//TODO: need close goroutine such as signalKillHandle..
+	go sc.waitStatus()	
 }
 
 func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore)*ServiceCollector{
 	labels := make(prometheus.Labels)
 
 	return &ServiceCollector{
-		StatusBuilding: prometheus.NewGaugeVec(
+		fastSerivceStatus: []*prometheus.GaugeVec{ 
+		prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace:   "mock",
 				Name:        "service_status_building",
@@ -54,7 +65,7 @@ func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore)*Se
 			},
 			[]string{"service_name", "namespace"},
 		),
-		StatusFailed: prometheus.NewGaugeVec(
+		prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace:   "mock",
 				Name:        "service_status_failed",
@@ -63,7 +74,7 @@ func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore)*Se
 			},
 			[]string{"service_name", "namespace"},
 		),
-		StatusRunning: prometheus.NewGaugeVec(
+		prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace:   "mock",
 				Name:        "service_status_runnning",
@@ -72,7 +83,7 @@ func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore)*Se
 			},
 			[]string{"service_name", "namespace"},
 		),
-		StatusStopped: prometheus.NewGaugeVec(
+		prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace:   "mock",
 				Name:        "service_status_stopped",
@@ -80,33 +91,31 @@ func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore)*Se
 				ConstLabels: labels,
 			},
 			[]string{"service_name", "namespace"},
-		),	
+		),
+		},	
 		pStore: ps,
 		dStore: ds,
 		rStore: rs,
+		statues: make(chan StatusInfo),
+		done:   make(chan struct{}),
 	}
 }
 
-func (s *ServiceCollector) collectorList() []prometheus.Collector {
-	return []prometheus.Collector{
-		s.StatusBuilding,
-		s.StatusFailed,
-		s.StatusRunning,
-		s.StatusStopped,
-	}
-}
-
-func (s *ServiceCollector)calculateStatus(rs v1beta1.ReplicaSet)int{
+func (s *ServiceCollector)calculateStatus(rs v1beta1.ReplicaSet){
+	var sinfo = StatusInfo{
+		name: rs.Name,
+		namespace: rs.Namespace,
+	}  
 	if rs.Status.AvailableReplicas == rs.Status.Replicas {
-		return statusRunning
+		sinfo.status = statusRunning
+	} else if rs.Status.ReadyReplicas < *rs.Spec.Replicas {
+		sinfo.status = statusBuilding
+	} else if *rs.Spec.Replicas == 0 {
+		sinfo.status = statusStopped
+	} else {
+		sinfo.status = statusBuilding
 	}
-	if rs.Status.ReadyReplicas < *rs.Spec.Replicas {
-		return statusFailed
-	}
-	if *rs.Spec.Replicas == 0 {
-		return statusStopped
-	}
-	return statusBuilding
+	s.statues<-sinfo
 }
 
 func (s *ServiceCollector)calculateSetValue(){
@@ -115,53 +124,28 @@ func (s *ServiceCollector)calculateSetValue(){
 		glog.Errorf("listing replicasets failed: %s", err)
 	} else {
 		for _, r := range replicasets {
-			status := s.calculateStatus(r)
-			s.setStatus(r.Name, r.Namespace, status)
+			s.calculateStatus(r)
 		}
 	}
 }
 
-func (s *ServiceCollector)setStatus(name string, namespace string, status int){
-	switch status {
-		case statusBuilding:
-			s.setValueBuilding(name, namespace)
-		case statusRunning:
-			s.setValueRunning(name, namespace)
-		case statusFailed:
-			s.setValueFailed(name, namespace)
-		case statusStopped:
-			s.setValueStopped(name, namespace)
-		default:
-			glog.Warningf("Unknow status: %d\n", status)
+func (s *ServiceCollector)waitStatus(){
+	for {
+		select {
+			case recv := <-s.statues:
+				s.mu.Lock()
+				for k, status := range s.fastSerivceStatus {
+					if k == recv.status {
+						status.WithLabelValues(recv.name, recv.namespace).Set(1)
+					} else {
+						status.WithLabelValues(recv.name, recv.namespace).Set(0)
+					}
+				}
+				s.mu.Unlock()
+			case <-s.done:
+				return	
+		}
 	}
-}
-
-func (s *ServiceCollector)setValueRunning(name string, namespace string){
-	s.StatusRunning.WithLabelValues(name, namespace).Set(1)
-	s.StatusBuilding.WithLabelValues(name, namespace).Set(0)
-	s.StatusFailed.WithLabelValues(name, namespace).Set(0)
-	s.StatusStopped.WithLabelValues(name, namespace).Set(0)
-}
-
-func (s *ServiceCollector)setValueFailed(name string, namespace string){
-	s.StatusRunning.WithLabelValues(name, namespace).Set(0)
-	s.StatusBuilding.WithLabelValues(name, namespace).Set(0)
-	s.StatusFailed.WithLabelValues(name, namespace).Set(1)
-	s.StatusStopped.WithLabelValues(name, namespace).Set(0)
-}
-
-func (s *ServiceCollector)setValueBuilding(name string, namespace string){
-	s.StatusRunning.WithLabelValues(name, namespace).Set(0)
-	s.StatusBuilding.WithLabelValues(name, namespace).Set(1)
-	s.StatusFailed.WithLabelValues(name, namespace).Set(0)
-	s.StatusStopped.WithLabelValues(name, namespace).Set(0)
-}
-
-func (s *ServiceCollector)setValueStopped(name string, namespace string){
-	s.StatusRunning.WithLabelValues(name, namespace).Set(0)
-	s.StatusBuilding.WithLabelValues(name, namespace).Set(0)
-	s.StatusFailed.WithLabelValues(name, namespace).Set(0)
-	s.StatusStopped.WithLabelValues(name, namespace).Set(1)
 }
 
 func (s *ServiceCollector)collect()error{
@@ -212,7 +196,17 @@ func (s *ServiceCollector) Collect(ch chan<- prometheus.Metric) {
 		glog.Errorf("failed collecting service metrics: %v", err)
 	}
 
+	s.mu.Lock()
 	for _, metric := range s.collectorList() {
 		metric.Collect(ch)
 	}
+	s.mu.Unlock()
+}
+
+func (s *ServiceCollector) collectorList() []prometheus.Collector {
+	var cl []prometheus.Collector
+	for _, metrics := range s.fastSerivceStatus {
+		cl = append(cl, metrics)
+	}
+	return cl
 }
