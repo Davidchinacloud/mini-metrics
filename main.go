@@ -14,7 +14,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	
-	//"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	//"github.com/sak0/mini-metrics/metrics"
 	"github.com/sak0/mini-metrics/collectors"
@@ -35,35 +34,6 @@ var (
 		"services":                 collectors.RegisterServiceCollector,
 	}	
 )
-
-/*type MiniExporter struct {
-	mu	sync.Mutex
-	collectors []prometheus.Collector
-}
-
-func NewMiniExporter()*MiniExporter{
-	return &MiniExporter{
-		collectors : []prometheus.Collector{
-			collectors.NewServiceCollector(),
-		},
-	}
-}
-
-func (c *MiniExporter) Describe(ch chan<- *prometheus.Desc) {
-	for _, cc := range c.collectors {
-		cc.Describe(ch)
-	}
-}
-
-func (c *MiniExporter) Collect(ch chan<- prometheus.Metric) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	fmt.Printf("Collect at %v\n", time.Now())
-
-	for _, cc := range c.collectors {
-		cc.Collect(ch)
-	}
-}*/
 
 func registerCollectors(kubeClient clientset.Interface, collectors []string, namespace string){
 		for _, c := range collectors{
@@ -107,12 +77,6 @@ func main(){
 	}
 	
 	registerCollectors(kubeClient, defaultCollectors, *namespace)
-	
-	/*err := prometheus.Register(NewMiniExporter())
-	if err != nil {
-		log.Fatalf("cannot export service error: %v", err)
-	}*/
-	
 	
 	http.Handle(*metricsPath, promhttp.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
