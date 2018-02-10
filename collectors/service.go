@@ -4,12 +4,12 @@ import (
 	"time"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
-	"golang.org/x/net/context"
-	"k8s.io/api/core/v1"
+	//"golang.org/x/net/context"
+	//"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
-	"k8s.io/apimachinery/pkg/fields"
+	//"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
+	//"k8s.io/client-go/tools/cache"
 )
 
 var (
@@ -33,56 +33,12 @@ type ServiceCollector struct {
 	rStore      		replicasetStore
 }
 
-func RegisterServiceCollector(kubeClient kubernetes.Interface, namespace string) {	
-	client := kubeClient.CoreV1().RESTClient()
-	glog.Infof("collect pod with %s", client.APIVersion())
-	plw := cache.NewListWatchFromClient(client, "pods", namespace, fields.Everything())
-	pinf := cache.NewSharedInformer(plw, &v1.Pod{}, resyncPeriod)
-	podLister := PodLister(func() (pods []v1.Pod, err error) {
-		for _, m := range pinf.GetStore().List() {
-			pods = append(pods, *m.(*v1.Pod))
-		}
-		return pods, nil
-	})
-	
-	client = kubeClient.ExtensionsV1beta1().RESTClient()
-	glog.Infof("collect deployment with %s", client.APIVersion())
-	dlw := cache.NewListWatchFromClient(client, "deployments", namespace, fields.Everything())
-	dinf := cache.NewSharedInformer(dlw, &v1beta1.Deployment{}, resyncPeriod)
-	dplLister := DeploymentLister(func() (deployments []v1beta1.Deployment, err error) {
-		for _, c := range dinf.GetStore().List() {
-			deployments = append(deployments, *(c.(*v1beta1.Deployment)))
-		}
-		return deployments, nil
-	})
-	
-	glog.Infof("collect replicaset with %s", client.APIVersion())
-	rslw := cache.NewListWatchFromClient(client, "replicasets", namespace, fields.Everything())
-	rsinf := cache.NewSharedInformer(rslw, &v1beta1.ReplicaSet{}, resyncPeriod)
-	replicaSetLister := ReplicaSetLister(func() (replicasets []v1beta1.ReplicaSet, err error) {
-		for _, c := range rsinf.GetStore().List() {
-			replicasets = append(replicasets, *(c.(*v1beta1.ReplicaSet)))
-		}
-		return replicasets, nil
-	})
+func RegisterServiceCollector(kubeClient kubernetes.Interface, namespace string) {
+	podLister := registerPodCollector(kubeClient, namespace)
+	dplLister := registerDeploymentCollector(kubeClient, namespace)
+	replicaSetLister := registerReplicaSetCollector(kubeClient, namespace)
 
 	prometheus.Register(newServiceCollector(podLister, dplLister, replicaSetLister))
-	go pinf.Run(context.Background().Done())
-	go dinf.Run(context.Background().Done())
-	go rsinf.Run(context.Background().Done())
-	
-	//just test for informer handlers
-	dinf.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(o interface{}) {
-			glog.V(5).Infof("catch AddFunc %v", o)
-		},
-		DeleteFunc: func(o interface{}) {
-			glog.V(5).Infof("catch DeleteFunc %v", o)
-		},
-		UpdateFunc: func(_, o interface{}) {
-			glog.V(5).Infof("catch UpdateFunc %v", o)
-		},
-	})
 }
 
 func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore)*ServiceCollector{
