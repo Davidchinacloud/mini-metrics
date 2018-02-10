@@ -1,8 +1,6 @@
 package collectors
 
 import (
-	"fmt"
-	"log"
 	"time"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -24,31 +22,6 @@ const (
 	statusRunning
 	statusStopped
 )
-
-type PodLister func() ([]v1.Pod, error)
-func (l PodLister) List() ([]v1.Pod, error) {
-	return l()
-}
-type podStore interface {
-	List() (pods []v1.Pod, err error)
-}
-
-type DeploymentLister func() ([]v1beta1.Deployment, error)
-func (l DeploymentLister) List() ([]v1beta1.Deployment, error) {
-	return l()
-}
-type deploymentStore interface {
-	List() (deployments []v1beta1.Deployment, err error)
-}
-
-type ReplicaSetLister func() ([]v1beta1.ReplicaSet, error)
-func (l ReplicaSetLister) List() ([]v1beta1.ReplicaSet, error) {
-	return l()
-}
-type replicasetStore interface {
-	List() (replicasets []v1beta1.ReplicaSet, err error)
-}
-
 
 type ServiceCollector struct {
 	StatusBuilding		*prometheus.GaugeVec
@@ -167,40 +140,6 @@ func (s *ServiceCollector) collectorList() []prometheus.Collector {
 	}
 }
 
-func (s *ServiceCollector)displayPod(pod v1.Pod){
-	glog.V(3).Infof("*****************************")
-	glog.V(5).Infof("[POD]%v", pod)
-	glog.V(3).Infof("Pod[%s] || %s", pod.Name, pod.Namespace)
-	glog.V(3).Infof("Node: %s", pod.Spec.NodeName)
-	glog.V(3).Infof("Phase: %s", pod.Status.Phase)
-	glog.V(3).Infof("PodIP: %s", pod.Status.PodIP)
-	glog.V(3).Infof("QOSClass: %v", pod.Status.QOSClass)
-	glog.V(3).Infof("*****************************")
-}
-
-func (s *ServiceCollector)displayDeployment(dl v1beta1.Deployment){
-	glog.V(3).Infof("*****************************")
-	glog.V(5).Infof("[DEPLOYMENT]%v", dl)
-	glog.V(3).Infof("Deployment[%s] || %s", dl.Name, dl.Namespace)
-	glog.V(3).Infof("Replicas: %d", *dl.Spec.Replicas)
-	glog.V(3).Infof("ReadyReplicas: %d", dl.Status.ReadyReplicas)
-	glog.V(3).Infof("AvailableReplicas: %d", dl.Status.AvailableReplicas)
-	glog.V(3).Infof("UnavailableReplicas: %d", dl.Status.UnavailableReplicas)
-	glog.V(5).Infof("PodTemplate: %#v", dl.Spec.Template)
-	glog.V(3).Infof("*****************************")
-}
-
-func (s *ServiceCollector)displayReplicaSet(rs v1beta1.ReplicaSet){
-	glog.V(3).Infof("*****************************")
-	glog.V(5).Infof("[ReplicaSet]%v", rs)
-	glog.V(3).Infof("ReplicaSet[%s] || %s", rs.Name, rs.Namespace)
-	glog.V(3).Infof("Replicas: %d", rs.Status.Replicas)
-	glog.V(3).Infof("ReadyReplicas: %d", rs.Status.ReadyReplicas)
-	glog.V(3).Infof("AvailableReplicas: %d", rs.Status.AvailableReplicas)
-	glog.V(5).Infof("Conditions: %#v", rs.Status.Conditions)
-	glog.V(3).Infof("*****************************")
-}
-
 func (s *ServiceCollector)calculateStatus(rs v1beta1.ReplicaSet)int{
 	if rs.Status.AvailableReplicas == rs.Status.Replicas {
 		return statusRunning
@@ -270,12 +209,7 @@ func (s *ServiceCollector)setValueStopped(name string, namespace string){
 }
 
 func (s *ServiceCollector)collect()error{
-	fmt.Printf("Collect at %v\n", time.Now())
-	/*var status float64
-	status = 1
-	s.Status.WithLabelValues("service-a", "node1234").Set(status)
-	status = 2
-	s.Status.WithLabelValues("service-b", "node5678").Set(status)*/
+	glog.V(3).Infof("Collect at %v\n", time.Now())
 	
 	pods, err := s.pStore.List()
 	if err != nil {
@@ -311,7 +245,7 @@ func (s *ServiceCollector)collect()error{
 }
 
 func (s *ServiceCollector) Describe(ch chan<- *prometheus.Desc) {
-	fmt.Printf("Describe at %v\n", time.Now())
+	glog.V(3).Infof("Describe at %v\n", time.Now())
 	for _, metric := range s.collectorList() {
 		metric.Describe(ch)
 	}
@@ -319,7 +253,7 @@ func (s *ServiceCollector) Describe(ch chan<- *prometheus.Desc) {
 
 func (s *ServiceCollector) Collect(ch chan<- prometheus.Metric) {
 	if err := s.collect(); err != nil {
-		log.Println("failed collecting service metrics:", err)
+		glog.Errorf("failed collecting service metrics: %v", err)
 	}
 
 	for _, metric := range s.collectorList() {
