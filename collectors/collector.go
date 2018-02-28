@@ -101,8 +101,16 @@ func (s *ServiceCollector)calculateStatus(rs v1beta1.ReplicaSet){
 	var sinfo = StatusInfo{
 		name: rs.Name,
 		namespace: rs.Namespace,
-	}  
-	if rs.Status.AvailableReplicas == rs.Status.Replicas {
+	}
+	owners := rs.GetOwnerReferences()
+	if len(owners) > 0 {
+		if owners[0].Controller != nil {
+			sinfo.name = owners[0].Name
+		}
+	}
+	  
+	if rs.Status.AvailableReplicas == rs.Status.Replicas &&
+	rs.Status.AvailableReplicas > 0{
 		sinfo.status = statusRunning
 	} else if rs.Status.ReadyReplicas < *rs.Spec.Replicas {
 		sinfo.status = statusBuilding
@@ -205,4 +213,11 @@ func (s *ServiceCollector) collectorList() []prometheus.Collector {
 		cl = append(cl, metrics)
 	}
 	return cl
+}
+
+func boolFloat64(b bool)float64{
+	if b {
+		return 1
+	}
+	return 0
 }
