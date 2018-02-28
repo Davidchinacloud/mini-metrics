@@ -4,13 +4,9 @@ import (
 	"time"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
-	//"golang.org/x/net/context"
-	//"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
-	//"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
 	"sync"
-	//"k8s.io/client-go/tools/cache"
 )
 
 var (

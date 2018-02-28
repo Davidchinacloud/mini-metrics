@@ -15,7 +15,6 @@ import (
 	"k8s.io/client-go/rest"
 	
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	//"github.com/sak0/mini-metrics/metrics"
 	"github.com/sak0/mini-metrics/collectors"
 )
 
