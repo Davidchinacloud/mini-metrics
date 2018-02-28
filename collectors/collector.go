@@ -4,6 +4,7 @@ import (
 	"time"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	"sync"
@@ -97,23 +98,54 @@ func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore)*Se
 	}
 }
 
-func (s *ServiceCollector)calculateStatus(rs v1beta1.ReplicaSet){
+func (s *ServiceCollector)calculateStatus(rs v1beta1.ReplicaSet, pods *[]v1.Pod){
 	var sinfo = StatusInfo{
 		name: rs.Name,
 		namespace: rs.Namespace,
 	}
+	
+	//Record Deployments/DaemonSets name as service name
 	owners := rs.GetOwnerReferences()
 	if len(owners) > 0 {
 		if owners[0].Controller != nil {
 			sinfo.name = owners[0].Name
 		}
 	}
+	
+	waitingReason := func(cs v1.ContainerStatus)string{
+		if cs.State.Waiting == nil {
+			return ""
+		}
+		return cs.State.Waiting.Reason
+	}
+	
+	//TODO: move pod-ref-rs out
+	hasErrorPod := func(rs v1beta1.ReplicaSet, pods *[]v1.Pod)bool{
+		for _, pod := range *pods{
+			ow := pod.GetOwnerReferences()
+			if len(ow) > 0 {
+				if ow[0].Name == rs.Name {
+					for _, cs := range pod.Status.ContainerStatuses {
+						reason := waitingReason(cs)
+						if reason == "ImagePullBackOff" || reason == "ErrImagePull"  {
+							return true
+						}
+					}
+				}
+			}
+		}
+		return false
+	}
 	  
 	if rs.Status.AvailableReplicas == rs.Status.Replicas &&
 	rs.Status.AvailableReplicas > 0{
 		sinfo.status = statusRunning
 	} else if rs.Status.ReadyReplicas < *rs.Spec.Replicas {
-		sinfo.status = statusBuilding
+		if hasErrorPod(rs, pods) {
+			sinfo.status = statusFailed
+		} else {
+			sinfo.status = statusBuilding
+		}
 	} else if *rs.Spec.Replicas == 0 {
 		sinfo.status = statusStopped
 	} else {
@@ -126,10 +158,13 @@ func (s *ServiceCollector)calculateSetValue(){
 	replicasets, err := s.rStore.List()
 	if err != nil {
 		glog.Errorf("listing replicasets failed: %s", err)
-	} else {
-		for _, r := range replicasets {
-			s.calculateStatus(r)
-		}
+	} 
+	pods, err := s.pStore.List()
+	if err != nil {
+		glog.Errorf("listing pods failed: %s", err)
+	} 
+	for _, r := range replicasets {
+		s.calculateStatus(r, &pods)
 	}
 }
 
