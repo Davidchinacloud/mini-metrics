@@ -51,6 +51,7 @@ func (s *ServiceCollector)displayPod(pod v1.Pod){
 	glog.V(3).Infof("Phase: %s", pod.Status.Phase)
 	for _, cs := range pod.Status.ContainerStatuses {
 		glog.V(3).Infof("Reason: %s", waitingReason(cs))
+		glog.V(3).Infof("Image: %s", cs.Image)
 	}
 	if len(owners) > 0 {
 		for _, owner := range owners{
@@ -63,7 +64,6 @@ func (s *ServiceCollector)displayPod(pod v1.Pod){
 			}
 		}
 	}
-	glog.V(3).Infof("Reason: %s", pod.Status.Reason)
 	glog.V(3).Infof("PodIP: %s", pod.Status.PodIP)
 	glog.V(3).Infof("QOSClass: %v", pod.Status.QOSClass)
 	glog.V(3).Infof("*****************************")
