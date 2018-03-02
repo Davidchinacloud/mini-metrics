@@ -7,10 +7,11 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/client-go/kubernetes"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sync"
 )
 
-var (
+var (	
 	resyncPeriod = 10 * time.Minute
 )
 
@@ -43,6 +44,9 @@ func RegisterServiceCollector(kubeClient kubernetes.Interface, namespace string)
 	replicaSetLister := registerReplicaSetCollector(kubeClient, namespace)
 	sc := newServiceCollector(podLister, dplLister, replicaSetLister)
 	prometheus.Register(sc)
+	
+	// just test k8s-client
+	testNodeListUpdate(kubeClient)
 	
 	//TODO: need close goroutine such as signalKillHandle..
 	go sc.waitStatus()	
@@ -255,4 +259,22 @@ func boolFloat64(b bool)float64{
 		return 1
 	}
 	return 0
+}
+
+// just test for k8s-client once list and update
+func testNodeListUpdate(kubeClient kubernetes.Interface){
+	nodes, err := kubeClient.Core().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		glog.Errorf("List nodes failed: %v", err)
+		return
+	}
+	if len(nodes.Items) > 0 {
+		node := nodes.Items[0]
+		glog.V(3).Infof("Nodes: %#v", node)
+		node.Annotations["checked"] = "true"
+		_, err = kubeClient.Core().Nodes().Update(&node)
+		if err != nil {
+			glog.Errorf("Update node failed: %v", err)
+		}
+	}
 }
