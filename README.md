@@ -28,6 +28,14 @@ Usage of ./mini-metrics:
     	log level for V logs
   -vmodule value
     	comma-separated list of pattern=N settings for file-filtered logging
+
+env:
+export KUBERNETES_SERVICE_PORT=443
+export KUBERNETES_SERVICE_HOST=172.16.74.176
+ls -al /var/run/secrets/kubernetes.io/serviceaccount/
+
+run cmd:
+./mini-metrics -v 3 -alsologtostderr -port 9090
 ```
 
 # How to build
