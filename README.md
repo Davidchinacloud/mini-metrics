@@ -35,7 +35,7 @@ export KUBERNETES_SERVICE_HOST=172.16.74.176
 ls -al /var/run/secrets/kubernetes.io/serviceaccount/
 
 run cmd:
-./mini-metrics -v 3 -alsologtostderr -port 9090
+./mini-metrics -v 3 -alsologtostderr -port 8080
 ```
 
 # How to build
