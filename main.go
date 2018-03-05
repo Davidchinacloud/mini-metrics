@@ -8,6 +8,9 @@ import (
 	"net/http"
 	"time"
 	"strconv"
+	"os"
+	"os/signal"
+	"syscall"
 	
 	"github.com/golang/glog"
 	clientset "k8s.io/client-go/kubernetes"
@@ -29,17 +32,18 @@ var (
 	namespace	= flag.String("namespace", metav1.NamespaceAll, "namespace to be enabled for monitoring")
 	
 	defaultCollectors = []string{"services"}
-	availableCollectors = map[string]func(kubeClient clientset.Interface, namespace string){
+	availableCollectors = map[string]func(kubeClient clientset.Interface, namespace string, ch chan struct{}){
 		"services":                 collectors.RegisterServiceCollector,
 	}	
 )
 
-func registerCollectors(kubeClient clientset.Interface, collectors []string, namespace string){
+func registerCollectors(kubeClient clientset.Interface, collectors []string, 
+	namespace string, ch chan struct{}){
 		for _, c := range collectors{
 			if f, ok := availableCollectors[c]; !ok {
 				glog.Warningf("Collector %s is not available", c)
 			} else {
-				f(kubeClient, namespace)
+				f(kubeClient, namespace, ch)
 			}
 		}
 	}
@@ -75,7 +79,8 @@ func main(){
 		return
 	}
 	
-	registerCollectors(kubeClient, defaultCollectors, *namespace)
+	stopCh := make(chan struct{})
+	registerCollectors(kubeClient, defaultCollectors, *namespace, stopCh)
 	
 	http.Handle(*metricsPath, promhttp.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -93,5 +98,12 @@ func main(){
 	})
 	
 	listenAddress := net.JoinHostPort("0.0.0.0", strconv.Itoa(*port))
-	log.Fatal(http.ListenAndServe(listenAddress, nil))
+	go log.Fatal(http.ListenAndServe(listenAddress, nil))
+	
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	glog.V(3).Infof("signal.Notify ready..")
+	<-c
+	close(stopCh)
+	glog.V(3).Infof("Bye bye...")
 }

@@ -38,11 +38,11 @@ type ServiceCollector struct {
 	mu                  sync.Mutex
 }
 
-func RegisterServiceCollector(kubeClient kubernetes.Interface, namespace string) {
+func RegisterServiceCollector(kubeClient kubernetes.Interface, namespace string, ch chan struct{}) {
 	podLister := registerPodCollector(kubeClient, namespace)
 	dplLister := registerDeploymentCollector(kubeClient, namespace)
 	replicaSetLister := registerReplicaSetCollector(kubeClient, namespace)
-	sc := newServiceCollector(podLister, dplLister, replicaSetLister)
+	sc := newServiceCollector(podLister, dplLister, replicaSetLister, ch)
 	prometheus.Register(sc)
 	
 	// just test k8s-client
@@ -52,7 +52,7 @@ func RegisterServiceCollector(kubeClient kubernetes.Interface, namespace string)
 	go sc.waitStatus()	
 }
 
-func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore)*ServiceCollector{
+func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore, ch chan struct{})*ServiceCollector{
 	labels := make(prometheus.Labels)
 
 	return &ServiceCollector{
@@ -98,7 +98,7 @@ func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore)*Se
 		dStore: ds,
 		rStore: rs,
 		statues: make(chan StatusInfo),
-		done:   make(chan struct{}),
+		done:   ch,
 	}
 }
 
@@ -186,6 +186,7 @@ func (s *ServiceCollector)waitStatus(){
 				}
 				s.mu.Unlock()
 			case <-s.done:
+				glog.V(3).Infof("Received SIGTERM, exiting gracefully..")
 				return	
 		}
 	}
