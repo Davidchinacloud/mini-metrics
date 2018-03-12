@@ -16,7 +16,7 @@ spec:
       serviceAccountName: mini-metrics
       containers:
       - name: kube-state-metrics
-        image: hub.chinacloud.com/prometheus/mini-metrics:v0.1
+        image: hub.chinacloud.com/prometheus/mini-metrics:v0.3
         ports:
         - name: http-metrics
           containerPort: 8080
