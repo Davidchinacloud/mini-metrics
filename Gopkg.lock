@@ -14,24 +14,6 @@
   version = "v0.4.7"
 
 [[projects]]
-  name = "github.com/Shopify/sarama"
-  packages = ["."]
-  revision = "f7be6aa2bc7b2e38edf816b08b582782194a1c02"
-  version = "v1.16.0"
-
-[[projects]]
-  name = "github.com/Sirupsen/logrus"
-  packages = ["."]
-  revision = "c155da19408a8799da419ed3eeb0cb5db0ad5dbc"
-  version = "v1.0.5"
-
-[[projects]]
-  name = "github.com/abbot/go-http-auth"
-  packages = ["."]
-  revision = "0ddd408d5d60ea76e320503cc7dd091992dee608"
-  version = "v0.4.0"
-
-[[projects]]
   name = "github.com/aws/aws-sdk-go"
   packages = [
     "aws",
@@ -76,6 +58,12 @@
   version = "v3.5.1"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/containerd/console"
+  packages = ["."]
+  revision = "cb7008ab3d8359b78c5f464cb7cf160107ad5925"
+
+[[projects]]
   name = "github.com/containerd/containerd"
   packages = [
     "api/services/containers/v1",
@@ -94,6 +82,7 @@
 [[projects]]
   name = "github.com/coreos/go-systemd"
   packages = [
+    "activation",
     "dbus",
     "util"
   ]
@@ -111,6 +100,12 @@
   packages = ["api/v1alpha"]
   revision = "6de500a70706403c8c611d80491aea64019141b0"
   version = "v1.29.0"
+
+[[projects]]
+  name = "github.com/cyphar/filepath-securejoin"
+  packages = ["."]
+  revision = "06bda8370f45268db985f7af15732444d94ed51c"
+  version = "v0.2.1"
 
 [[projects]]
   name = "github.com/davecgh/go-spew"
@@ -145,10 +140,7 @@
     "api/types/versions",
     "api/types/volume",
     "client",
-    "pkg/longpath",
     "pkg/mount",
-    "pkg/symlink",
-    "pkg/system",
     "pkg/tlsconfig"
   ]
   revision = "092cba3727bb9b4a2f0e922cd6c0f93ea270e363"
@@ -171,37 +163,10 @@
   version = "v0.3.2"
 
 [[projects]]
-  name = "github.com/eapache/go-resiliency"
-  packages = ["breaker"]
-  revision = "6800482f2c813e689c88b7ed3282262385011890"
-  version = "v1.0.0"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/eapache/go-xerial-snappy"
-  packages = ["."]
-  revision = "bb955e01b9346ac19dc29eb16586c90ded99a98c"
-
-[[projects]]
-  name = "github.com/eapache/queue"
-  packages = ["."]
-  revision = "44cc805cf13205b55f69e14bcb69867d1ae92f98"
-  version = "v1.1.0"
-
-[[projects]]
   name = "github.com/euank/go-kmsg-parser"
   packages = ["kmsgparser"]
   revision = "5ba4d492e455a77d25dcf0d2c4acc9f2afebef4e"
   version = "v2.0.0"
-
-[[projects]]
-  name = "github.com/garyburd/redigo"
-  packages = [
-    "internal",
-    "redis"
-  ]
-  revision = "a69d19351219b6dd56f274f96d85a7014a2ec34e"
-  version = "v1.6.0"
 
 [[projects]]
   name = "github.com/ghodss/yaml"
@@ -252,12 +217,6 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/golang/snappy"
-  packages = ["."]
-  revision = "553a641470496b2327abcac10b36396bd98e45c9"
-
-[[projects]]
-  branch = "master"
   name = "github.com/google/btree"
   packages = ["."]
   revision = "e89373fe6b4a7413d7acd6da1725b83ef713e6e4"
@@ -265,9 +224,7 @@
 [[projects]]
   name = "github.com/google/cadvisor"
   packages = [
-    ".",
     "accelerators",
-    "api",
     "cache/memory",
     "collector",
     "container",
@@ -282,9 +239,6 @@
     "devicemapper",
     "events",
     "fs",
-    "healthz",
-    "http",
-    "http/mux",
     "info/v1",
     "info/v2",
     "machine",
@@ -292,30 +246,16 @@
     "manager/watcher",
     "manager/watcher/raw",
     "manager/watcher/rkt",
-    "metrics",
-    "pages",
-    "pages/static",
     "storage",
-    "storage/bigquery",
-    "storage/bigquery/client",
-    "storage/elasticsearch",
-    "storage/influxdb",
-    "storage/kafka",
-    "storage/redis",
-    "storage/statsd",
-    "storage/statsd/client",
-    "storage/stdout",
     "summary",
     "utils",
     "utils/cloudinfo",
-    "utils/container",
     "utils/cpuload",
     "utils/cpuload/netlink",
     "utils/docker",
     "utils/oomparser",
     "utils/sysfs",
     "utils/sysinfo",
-    "validate",
     "version",
     "zfs"
   ]
@@ -357,16 +297,6 @@
   revision = "67c1a7788c3c73166b30bbecca64a0e3707c4be9"
 
 [[projects]]
-  name = "github.com/influxdb/influxdb"
-  packages = [
-    "client",
-    "models",
-    "pkg/escape"
-  ]
-  revision = "f55169eaca706f78e2d66edb0b8e62861712a747"
-  version = "v0.10.3"
-
-[[projects]]
   name = "github.com/jmespath/go-jmespath"
   packages = ["."]
   revision = "0b12d6b5"
@@ -402,6 +332,12 @@
   version = "v2.1.1"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/mrunalp/fileutils"
+  packages = ["."]
+  revision = "7d4729fb36185a7c1719923406c9d40e54fb93c7"
+
+[[projects]]
   name = "github.com/opencontainers/go-digest"
   packages = ["."]
   revision = "279bed98673dd5bef374d3b6e4b09e2af76183bf"
@@ -410,6 +346,7 @@
 [[projects]]
   name = "github.com/opencontainers/runc"
   packages = [
+    ".",
     "libcontainer",
     "libcontainer/apparmor",
     "libcontainer/cgroups",
@@ -418,23 +355,34 @@
     "libcontainer/configs",
     "libcontainer/configs/validate",
     "libcontainer/criurpc",
+    "libcontainer/intelrdt",
     "libcontainer/keys",
-    "libcontainer/label",
+    "libcontainer/mount",
+    "libcontainer/nsenter",
     "libcontainer/seccomp",
-    "libcontainer/selinux",
+    "libcontainer/specconv",
     "libcontainer/stacktrace",
     "libcontainer/system",
     "libcontainer/user",
     "libcontainer/utils"
   ]
-  revision = "baf6536d6259209c3edfa2b22237af82942d3dfa"
-  version = "v0.1.1"
+  revision = "4fc53a81fb7c994640722ac585fa9ca548971871"
+  version = "v1.0.0-rc5"
 
 [[projects]]
   name = "github.com/opencontainers/runtime-spec"
   packages = ["specs-go"]
   revision = "4e3b9264a330d094b0386c3703c5f379119711e8"
   version = "v1.0.1"
+
+[[projects]]
+  name = "github.com/opencontainers/selinux"
+  packages = [
+    "go-selinux",
+    "go-selinux/label"
+  ]
+  revision = "ba1aefe8057f1d0cfb8e88d0ec1dc85925ef987d"
+  version = "v1.0.0-rc1"
 
 [[projects]]
   branch = "master"
@@ -447,18 +395,6 @@
   packages = ["."]
   revision = "5f041e8faa004a95c88a202771f4cc3e991971e6"
   version = "v2.0.1"
-
-[[projects]]
-  name = "github.com/pierrec/lz4"
-  packages = ["."]
-  revision = "2fcda4cb7018ce05a25959d2fe08c83e3329f169"
-  version = "v1.1"
-
-[[projects]]
-  name = "github.com/pierrec/xxHash"
-  packages = ["xxHash32"]
-  revision = "f051bb7f1d1aaf1b5a665d74fb6b0217712c69f7"
-  version = "v0.1.1"
 
 [[projects]]
   name = "github.com/pkg/errors"
@@ -503,12 +439,6 @@
   revision = "cb4147076ac75738c9a7d279075a253c0cc5acbd"
 
 [[projects]]
-  branch = "master"
-  name = "github.com/rcrowley/go-metrics"
-  packages = ["."]
-  revision = "8732c616f52954686704c8645fe1a9d59e9df7c1"
-
-[[projects]]
   name = "github.com/rkt/rkt"
   packages = ["api/v1alpha"]
   revision = "6de500a70706403c8c611d80491aea64019141b0"
@@ -521,6 +451,12 @@
   version = "v0.9.0"
 
 [[projects]]
+  name = "github.com/sirupsen/logrus"
+  packages = ["."]
+  revision = "c155da19408a8799da419ed3eeb0cb5db0ad5dbc"
+  version = "v1.0.5"
+
+[[projects]]
   name = "github.com/spf13/pflag"
   packages = ["."]
   revision = "e57e3eeb33f795204c1ca35f56c44f83227c6e66"
@@ -531,6 +467,12 @@
   name = "github.com/syndtr/gocapability"
   packages = ["capability"]
   revision = "33e07d32887e1e06b7c025f27ce52f62c7990bc0"
+
+[[projects]]
+  name = "github.com/urfave/cli"
+  packages = ["."]
+  revision = "cfb38830724cc34fedffe9a2a29fb54fa9169cd1"
+  version = "v1.20.0"
 
 [[projects]]
   name = "github.com/vishvananda/netlink"
@@ -550,11 +492,7 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/crypto"
-  packages = [
-    "bcrypt",
-    "blowfish",
-    "ssh/terminal"
-  ]
+  packages = ["ssh/terminal"]
   revision = "374053ea96cb300f8671b8d3b07edeeb06e203b4"
 
 [[projects]]
@@ -577,17 +515,6 @@
     "trace"
   ]
   revision = "0ed95abb35c445290478a5348a7b38bb154135fd"
-
-[[projects]]
-  branch = "master"
-  name = "golang.org/x/oauth2"
-  packages = [
-    ".",
-    "internal",
-    "jws",
-    "jwt"
-  ]
-  revision = "fdc9e635145ae97e6c2cb777c48305600cf515cb"
 
 [[projects]]
   branch = "master"
@@ -618,31 +545,6 @@
     "unicode/rangetable"
   ]
   revision = "e19ae1496984b1c655b8044a65c0300a3c878dd3"
-
-[[projects]]
-  branch = "master"
-  name = "google.golang.org/api"
-  packages = [
-    "bigquery/v2",
-    "gensupport",
-    "googleapi",
-    "googleapi/internal/uritemplates"
-  ]
-  revision = "c24aa0e5ed34558ea50c016e4fb92c5e9aa69f2c"
-
-[[projects]]
-  name = "google.golang.org/appengine"
-  packages = [
-    "internal",
-    "internal/base",
-    "internal/datastore",
-    "internal/log",
-    "internal/remote_api",
-    "internal/urlfetch",
-    "urlfetch"
-  ]
-  revision = "150dc57a1b433e64154302bdc40b6bb8aefa313a"
-  version = "v1.0.0"
 
 [[projects]]
   branch = "master"
@@ -685,16 +587,6 @@
   packages = ["."]
   revision = "3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4"
   version = "v0.9.0"
-
-[[projects]]
-  name = "gopkg.in/olivere/elastic.v2"
-  packages = [
-    ".",
-    "backoff",
-    "uritemplates"
-  ]
-  revision = "cdc8c0afbe6aeeb1b4a99aacb1a8ce9d6f985203"
-  version = "v2.0.60"
 
 [[projects]]
   branch = "v2"
@@ -842,6 +734,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "c629a31d58b1a6c092ac2a434ab9c014eca4760264a66c880f5d13be64764f92"
+  inputs-digest = "2e843e9e3cebb84ad0f24a59ce2904bee4fd95bc14554b415691b103ce35deda"
   solver-name = "gps-cdcl"
   solver-version = 1
