@@ -6,6 +6,7 @@ import (
 	
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+        "github.com/google/cadvisor/cache/memory"
 	cmanager "github.com/google/cadvisor/manager"
 	cadvisormetrics "github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/utils/sysfs"
