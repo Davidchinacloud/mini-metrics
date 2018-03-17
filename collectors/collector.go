@@ -2,8 +2,14 @@ package collectors
 
 import (
 	"time"
+	"net/http"
+	
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	cmanager "github.com/google/cadvisor/manager"
+	cadvisormetrics "github.com/google/cadvisor/container"
+	"github.com/google/cadvisor/utils/sysfs"
+	
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/client-go/kubernetes"
@@ -14,6 +20,11 @@ import (
 var (	
 	resyncPeriod = 10 * time.Minute
 )
+
+const statsCacheDuration = 2 * time.Minute
+const maxHousekeepingInterval = 15 * time.Second
+const defaultHousekeepingInterval = 10 * time.Second
+const allowDynamicHousekeeping = true
 
 const (
 	statusBuilding = iota
@@ -47,6 +58,17 @@ func RegisterServiceCollector(kubeClient kubernetes.Interface, namespace string,
 	
 	// just test k8s-client
 	testNodeListUpdate(kubeClient)
+	
+	sysFs := sysfs.NewRealSysFs()
+	ignoreMetrics := cadvisormetrics.MetricSet{cadvisormetrics.NetworkTcpUsageMetrics: struct{}{}, cadvisormetrics.NetworkUdpUsageMetrics: struct{}{}}
+	m, err := cmanager.New(memory.New(statsCacheDuration, nil), 
+		sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, ignoreMetrics, http.DefaultClient)
+	if err != nil {
+		glog.Errorf("cmanager.New failed %v", err)
+		return 
+	} else {
+		glog.V(2).Infof("cmanager.New: %#v", m)
+	}	
 	
 	//TODO: need close goroutine such as signalKillHandle..
 	go sc.waitStatus()	
