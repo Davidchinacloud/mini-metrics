@@ -32,3 +32,11 @@
 [prune]
   go-tests = true
   unused-packages = true
+
+[[constraint]]
+  name = "golang.org/x/exp"
+  revision = "292a51b8d262487dab23a588950e8052d63d9113"
+
+[[constraint]]
+  branch = "release-v0.28"
+  name = "github.com/google/cadvisor"
