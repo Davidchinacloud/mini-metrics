@@ -6,9 +6,10 @@ import (
 	
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
-        "github.com/google/cadvisor/cache/memory"
+	"github.com/google/cadvisor/cache/memory"
 	cmanager "github.com/google/cadvisor/manager"
 	cadvisormetrics "github.com/google/cadvisor/container"
+	cinfo "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/utils/sysfs"
 	
 	"k8s.io/api/core/v1"
@@ -69,7 +70,17 @@ func RegisterServiceCollector(kubeClient kubernetes.Interface, namespace string,
 		return 
 	} else {
 		glog.V(2).Infof("cmanager.New: %#v", m)
-	}	
+		err = m.Start()
+		if err != nil {
+			glog.Errorf("cmanager.Start Failed: %v", err)
+		}
+	}
+	containers, err := m.SubcontainersInfo("/", &cinfo.ContainerInfoRequest{NumStats: 1})
+	if err != nil {
+		glog.Errorf("SubcontainersInfo Failed: %v", err)
+	} else {
+		glog.V(2).Infof("cmanager.containers: %#v", containers)
+	}
 	
 	//TODO: need close goroutine such as signalKillHandle..
 	go sc.waitStatus()	
