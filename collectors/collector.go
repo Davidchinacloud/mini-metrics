@@ -61,6 +61,7 @@ func RegisterServiceCollector(kubeClient kubernetes.Interface, namespace string,
 	// just test k8s-client
 	testNodeListUpdate(kubeClient)
 	
+	//collector containers by cadvisor
 	sysFs := sysfs.NewRealSysFs()
 	ignoreMetrics := cadvisormetrics.MetricSet{cadvisormetrics.NetworkTcpUsageMetrics: struct{}{}, cadvisormetrics.NetworkUdpUsageMetrics: struct{}{}}
 	m, err := cmanager.New(memory.New(statsCacheDuration, nil), 
@@ -79,8 +80,12 @@ func RegisterServiceCollector(kubeClient kubernetes.Interface, namespace string,
 	if err != nil {
 		glog.Errorf("SubcontainersInfo Failed: %v", err)
 	} else {
-		glog.V(2).Infof("cmanager.containers: %#v", containers)
+		for _, c := range containers {
+			glog.V(2).Infof("containerRoot: %v, image: %v, pod_name: %v, name: %v, namespace: %v", 
+				c.Name, c.Spec.Image, c.Spec.Labels[KubernetesPodNameLabel], c.Spec.Labels[KubernetesContainerNameLabel], c.Spec.Labels[KubernetesPodNamespaceLabel])
+		}
 	}
+	//collector containers by cadvisor
 	
 	//TODO: need close goroutine such as signalKillHandle..
 	go sc.waitStatus()	
