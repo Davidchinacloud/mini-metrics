@@ -68,3 +68,16 @@ func (s *ServiceCollector)displayPod(pod v1.Pod){
 	glog.V(3).Infof("QOSClass: %v", pod.Status.QOSClass)
 	glog.V(3).Infof("*****************************")
 }
+
+func (s *ServiceCollector)podRequestSum(pod v1.Pod)int64 {
+	var podSum int64
+	for _, container := range pod.Spec.Containers {
+		if containerRequest, ok := container.Resources.Requests["memory"]; ok {
+			//podSum += containerRequest.MilliValue()
+			podSum += containerRequest.Value()
+		} else {
+			return -1
+		}
+	}
+	return podSum/1024/1024
+}

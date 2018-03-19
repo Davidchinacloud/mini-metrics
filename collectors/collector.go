@@ -49,18 +49,10 @@ type ServiceCollector struct {
 	statues             chan StatusInfo
 	done                chan struct{}
 	mu                  sync.Mutex
+	cm        			cmanager.Manager                  
 }
 
 func RegisterServiceCollector(kubeClient kubernetes.Interface, namespace string, ch chan struct{}) {
-	podLister := registerPodCollector(kubeClient, namespace)
-	dplLister := registerDeploymentCollector(kubeClient, namespace)
-	replicaSetLister := registerReplicaSetCollector(kubeClient, namespace)
-	sc := newServiceCollector(podLister, dplLister, replicaSetLister, ch)
-	prometheus.Register(sc)
-	
-	// just test k8s-client
-	testNodeListUpdate(kubeClient)
-	
 	//collector containers by cadvisor
 	sysFs := sysfs.NewRealSysFs()
 	ignoreMetrics := cadvisormetrics.MetricSet{cadvisormetrics.NetworkTcpUsageMetrics: struct{}{}, cadvisormetrics.NetworkUdpUsageMetrics: struct{}{}}
@@ -76,24 +68,23 @@ func RegisterServiceCollector(kubeClient kubernetes.Interface, namespace string,
 			glog.Errorf("cmanager.Start Failed: %v", err)
 		}
 	}
-	containers, err := m.SubcontainersInfo("/", &cinfo.ContainerInfoRequest{NumStats: 1})
-	if err != nil {
-		glog.Errorf("SubcontainersInfo Failed: %v", err)
-	} else {
-		for _, c := range containers {
-			glog.V(2).Infof("containerRoot: %v, image: %v, pod_name: %v, name: %v, namespace: %v, memory: %d/%d MB", 
-				c.Name, c.Spec.Image, c.Spec.Labels[KubernetesPodNameLabel], 
-				c.Spec.Labels[KubernetesContainerNameLabel], c.Spec.Labels[KubernetesPodNamespaceLabel], 
-				c.Stats[0].Memory.Usage/1024/1024, c.Stats[0].Memory.MaxUsage/1024/1024)
-		}
-	}
+	
+	podLister := registerPodCollector(kubeClient, namespace)
+	dplLister := registerDeploymentCollector(kubeClient, namespace)
+	replicaSetLister := registerReplicaSetCollector(kubeClient, namespace)
+	sc := newServiceCollector(podLister, dplLister, replicaSetLister, m, ch)
+	prometheus.Register(sc)
+	
+	// just test k8s-client
+	testNodeListUpdate(kubeClient)
+	
 	//collector containers by cadvisor
 	
 	//TODO: need close goroutine such as signalKillHandle..
 	go sc.waitStatus()	
 }
 
-func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore, ch chan struct{})*ServiceCollector{
+func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore, m cmanager.Manager, ch chan struct{})*ServiceCollector{
 	labels := make(prometheus.Labels)
 
 	return &ServiceCollector{
@@ -140,6 +131,7 @@ func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore, ch
 		rStore: rs,
 		statues: make(chan StatusInfo),
 		done:   ch,
+		cm:     m,
 	}
 }
 
@@ -236,15 +228,30 @@ func (s *ServiceCollector)waitStatus(){
 func (s *ServiceCollector)collect()error{
 	glog.V(3).Infof("Collect at %v\n", time.Now())
 	
+	containers, err := s.cm.SubcontainersInfo("/", &cinfo.ContainerInfoRequest{NumStats: 1})
+	if err != nil {
+		glog.Errorf("SubcontainersInfo Failed: %v", err)
+		return err
+	}
 	pods, err := s.pStore.List()
+	itemsLen := len(pods)
+	requests := make(map[string]int64, itemsLen)
+	metrics := make(map[string]int64, itemsLen)
 	if err != nil {
 		glog.Errorf("listing pods failed: %s", err)
 		return err
 	} else {
 		for _, pod := range pods {
 			s.displayPod(pod)
+			podMetricsSum := s.podMetricsSum(pod, containers)
+			podRequestSum := s.podRequestSum(pod)
+			requests[pod.Name] = podRequestSum
+			metrics[pod.Name] = podMetricsSum
 		}
 	}
+	glog.V(2).Infof("request: %v", requests)
+	glog.V(2).Infof("metrics: %v", metrics)
+
 	
 	deployments, err := s.dStore.List()
 	if err != nil {
