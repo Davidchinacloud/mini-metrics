@@ -81,8 +81,10 @@ func RegisterServiceCollector(kubeClient kubernetes.Interface, namespace string,
 		glog.Errorf("SubcontainersInfo Failed: %v", err)
 	} else {
 		for _, c := range containers {
-			glog.V(2).Infof("containerRoot: %v, image: %v, pod_name: %v, name: %v, namespace: %v", 
-				c.Name, c.Spec.Image, c.Spec.Labels[KubernetesPodNameLabel], c.Spec.Labels[KubernetesContainerNameLabel], c.Spec.Labels[KubernetesPodNamespaceLabel])
+			glog.V(2).Infof("containerRoot: %v, image: %v, pod_name: %v, name: %v, namespace: %v, memory: %d/%d MB", 
+				c.Name, c.Spec.Image, c.Spec.Labels[KubernetesPodNameLabel], 
+				c.Spec.Labels[KubernetesContainerNameLabel], c.Spec.Labels[KubernetesPodNamespaceLabel], 
+				c.Stats[0].Memory.Usage/1024/1024, c.Stats[0].Memory.MaxUsage/1024/1024)
 		}
 	}
 	//collector containers by cadvisor
