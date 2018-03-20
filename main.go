@@ -16,6 +16,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
+	resourceclient "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1"
 	
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sak0/mini-metrics/collectors"
@@ -78,6 +79,10 @@ func main(){
 		glog.Errorf("Can't create kubeneres client: %v\n", err)
 		return
 	}
+	
+	config, err := rest.InClusterConfig()
+	metricsClient := resourceclient.NewForConfigOrDie(config)
+	glog.V(2).Infof("metricsClient %#v", metricsClient)
 	
 	stopCh := make(chan struct{})
 	registerCollectors(kubeClient, defaultCollectors, *namespace, stopCh)
