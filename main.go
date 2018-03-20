@@ -14,6 +14,7 @@ import (
 	
 	"github.com/golang/glog"
 	clientset "k8s.io/client-go/kubernetes"
+	//"k8s.io/apimachinery/pkg/labels"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	resourceclient "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1"
@@ -33,18 +34,18 @@ var (
 	namespace	= flag.String("namespace", metav1.NamespaceAll, "namespace to be enabled for monitoring")
 	
 	defaultCollectors = []string{"services"}
-	availableCollectors = map[string]func(kubeClient clientset.Interface, namespace string, ch chan struct{}){
+	availableCollectors = map[string]func(kubeClient clientset.Interface, metricsClient *resourceclient.MetricsV1beta1Client, namespace string, ch chan struct{}){
 		"services":                 collectors.RegisterServiceCollector,
 	}	
 )
 
-func registerCollectors(kubeClient clientset.Interface, collectors []string, 
+func registerCollectors(kubeClient clientset.Interface, metricsClient *resourceclient.MetricsV1beta1Client, collectors []string, 
 	namespace string, ch chan struct{}){
 		for _, c := range collectors{
 			if f, ok := availableCollectors[c]; !ok {
 				glog.Warningf("Collector %s is not available", c)
 			} else {
-				f(kubeClient, namespace, ch)
+				f(kubeClient, metricsClient, namespace, ch)
 			}
 		}
 	}
@@ -82,10 +83,10 @@ func main(){
 	
 	config, err := rest.InClusterConfig()
 	metricsClient := resourceclient.NewForConfigOrDie(config)
-	glog.V(2).Infof("metricsClient %#v", metricsClient)
+	//metrics, err := metricsClient.PodMetricses(metav1.NamespaceAll).List(metav1.ListOptions{LabelSelector: selector.String()})
 	
 	stopCh := make(chan struct{})
-	registerCollectors(kubeClient, defaultCollectors, *namespace, stopCh)
+	registerCollectors(kubeClient, metricsClient, defaultCollectors, *namespace, stopCh)
 	
 	http.Handle(*metricsPath, promhttp.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

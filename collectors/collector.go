@@ -16,6 +16,8 @@ import (
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	resourceclient "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1"
+	
 	"sync"
 )
 
@@ -52,7 +54,22 @@ type ServiceCollector struct {
 	cm        			cmanager.Manager                  
 }
 
-func RegisterServiceCollector(kubeClient kubernetes.Interface, namespace string, ch chan struct{}) {
+func RegisterServiceCollector(kubeClient kubernetes.Interface, metricsClient *resourceclient.MetricsV1beta1Client, namespace string, ch chan struct{}) {
+	metrics, err := metricsClient.PodMetricses(metav1.NamespaceAll).List(metav1.ListOptions{})
+	glog.V(5).Infof("metrics %#v", metrics)	
+	for _, m := range metrics.Items {
+		//podSum := int64(0)
+		//missing := len(m.Containers) == 0
+		for _, c := range m.Containers {
+			resValue, found := c.Usage[v1.ResourceName("memory")]
+			if found {
+				glog.V(2).Infof("[%s] - %v", m.Name, resValue)
+			} else {
+				glog.V(2).Infof("[%s] - NONE!!", m.Name)
+			}
+		}
+	}
+	
 	//collector containers by cadvisor
 	sysFs := sysfs.NewRealSysFs()
 	ignoreMetrics := cadvisormetrics.MetricSet{cadvisormetrics.NetworkTcpUsageMetrics: struct{}{}, cadvisormetrics.NetworkUdpUsageMetrics: struct{}{}}
