@@ -37,18 +37,33 @@ const (
 	statusStopped
 )
 
+const (
+	resourceMemory = iota
+	resourceCPU
+	resourceDisk
+)
+
 type StatusInfo struct {
 	name string
 	namespace string
 	status int
 }
 
+type UtilizInfo struct {
+	resource int
+	namespace string
+	podname   string
+	value float64
+}
+
 type ServiceCollector struct {
 	fastSerivceStatus	[]*prometheus.GaugeVec
+	fastResourceUtil    []*prometheus.GaugeVec
 	pStore				podStore
 	dStore				deploymentStore
 	rStore      		replicasetStore
 	statues             chan StatusInfo
+	util				chan UtilizInfo
 	done                chan struct{}
 	mClient             *resourceclient.MetricsV1beta1Client
 	mu                  sync.Mutex
@@ -82,7 +97,8 @@ func RegisterServiceCollector(kubeClient kubernetes.Interface, metricsClient *re
 	testNodeListUpdate(kubeClient)
 	
 	//TODO: need close goroutine such as signalKillHandle..
-	go sc.waitStatus()	
+	go sc.waitStatus()
+	go sc.waitUtilization()
 }
 
 func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore, 
@@ -93,7 +109,7 @@ func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore,
 		fastSerivceStatus: []*prometheus.GaugeVec{ 
 		prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Namespace:   "mock",
+				Namespace:   "fast",
 				Name:        "service_status_building",
 				Help:        "TEST FOR SERVICE STATUS",
 				ConstLabels: labels,
@@ -102,7 +118,7 @@ func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore,
 		),
 		prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Namespace:   "mock",
+				Namespace:   "fast",
 				Name:        "service_status_failed",
 				Help:        "TEST FOR SERVICE STATUS",
 				ConstLabels: labels,
@@ -111,7 +127,7 @@ func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore,
 		),
 		prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Namespace:   "mock",
+				Namespace:   "fast",
 				Name:        "service_status_runnning",
 				Help:        "TEST FOR SERVICE STATUS",
 				ConstLabels: labels,
@@ -120,18 +136,30 @@ func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore,
 		),
 		prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Namespace:   "mock",
+				Namespace:   "fast",
 				Name:        "service_status_stopped",
 				Help:        "TEST FOR SERVICE STATUS",
 				ConstLabels: labels,
 			},
 			[]string{"service_name", "namespace"},
 		),
-		},	
+		},
+		fastResourceUtil: []*prometheus.GaugeVec {
+		prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace:   "fast",
+				Name:        "pod_memory_utilization",
+				Help:        "POD MEMORY UTILIZATION",
+				ConstLabels: labels,
+			},
+			[]string{"pod_name", "namespace"},
+		),
+		},
 		pStore: ps,
 		dStore: ds,
 		rStore: rs,
 		statues: make(chan StatusInfo),
+		util: make(chan UtilizInfo),
 		mClient: metricsClient,
 		done:   ch,
 		cManager:     m,
@@ -228,6 +256,25 @@ func (s *ServiceCollector)waitStatus(){
 	}
 }
 
+func (s *ServiceCollector)waitUtilization(){
+	for {
+		select {
+			case recv := <-s.util:
+				s.mu.Lock()
+				for k, status := range s.fastResourceUtil {
+					if k == recv.resource {
+						status.WithLabelValues(recv.podname, recv.namespace).Set(recv.value)
+						break
+					}
+				}
+				s.mu.Unlock()
+			case <-s.done:
+				glog.V(3).Infof("Received SIGTERM, exiting gracefully..")
+				return	
+		}
+	}
+}
+
 func (s *ServiceCollector)collect()error{
 	glog.V(3).Infof("Collect at %v\n", time.Now())
 	metrics, err := s.mClient.PodMetricses(metav1.NamespaceAll).List(metav1.ListOptions{})
@@ -285,8 +332,16 @@ func (s *ServiceCollector)collect()error{
 		}
 	}
 	glog.V(2).Infof("utilization: %v", utilization)
+	var uinfo = UtilizInfo{
+		resource : resourceMemory,
+	}
+	for podName, util := range utilization{
+		uinfo.podname = podName
+		uinfo.namespace = "default"
+		uinfo.value = float64(util)
+		s.util<-uinfo
+	}
 
-	
 	deployments, err := s.dStore.List()
 	if err != nil {
 		glog.Errorf("listing deployment failed: %s", err)
@@ -332,6 +387,9 @@ func (s *ServiceCollector) Collect(ch chan<- prometheus.Metric) {
 func (s *ServiceCollector) collectorList() []prometheus.Collector {
 	var cl []prometheus.Collector
 	for _, metrics := range s.fastSerivceStatus {
+		cl = append(cl, metrics)
+	}
+	for _, metrics := range s.fastResourceUtil {
 		cl = append(cl, metrics)
 	}
 	return cl
