@@ -7,6 +7,8 @@ const (
 	KubernetesContainerNameLabel = "io.kubernetes.container.name"
 )
 
+type PodMetricsInfo map[string]int64
+
 func GetContainerName(labels map[string]string) string {
 	return labels[KubernetesContainerNameLabel]
 }

@@ -79,5 +79,5 @@ func (s *ServiceCollector)podRequestSum(pod v1.Pod)int64 {
 			return -1
 		}
 	}
-	return podSum/1024/1024
+	return podSum
 }
