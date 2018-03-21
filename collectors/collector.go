@@ -56,6 +56,12 @@ type UtilizInfo struct {
 	value float64
 }
 
+type PodInfo struct {
+	name    	string
+	namespace	string
+	tenantId	string
+}
+
 type ServiceCollector struct {
 	fastSerivceStatus	[]*prometheus.GaugeVec
 	fastResourceUtil    []*prometheus.GaugeVec
@@ -80,7 +86,7 @@ func RegisterServiceCollector(kubeClient kubernetes.Interface, metricsClient *re
 		glog.Errorf("cmanager.New failed %v", err)
 		return 
 	} else {
-		glog.V(2).Infof("cmanager.New: %#v", m)
+		glog.V(3).Infof("cmanager.New: %v", m)
 		err = m.Start()
 		if err != nil {
 			glog.Errorf("cmanager.Start Failed: %v", err)
