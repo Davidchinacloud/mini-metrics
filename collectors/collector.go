@@ -288,7 +288,7 @@ func (s *ServiceCollector)collect()error{
 	if err != nil {
 		return err
 	}
-	glog.V(2).Infof("PodMetricsInfo: %#v", res)
+	glog.V(3).Infof("PodMetricsInfo: %#v", res)
 	
 	containers, err := s.cManager.SubcontainersInfo("/", &cinfo.ContainerInfoRequest{NumStats: 1})
 	if err != nil {
@@ -296,6 +296,10 @@ func (s *ServiceCollector)collect()error{
 		return err
 	}
 	pods, err := s.pStore.List()
+	if err != nil {
+		glog.Errorf("ListPods Failed: %v", err)
+		return err
+	}
 	itemsLen := len(pods)
 	requests := make(map[string]int64, itemsLen)
 	localMetrics := make(map[string]int64, itemsLen)
@@ -315,8 +319,8 @@ func (s *ServiceCollector)collect()error{
 			localMetrics[pod.Name] = podMetricsSum
 		}
 	}
-	glog.V(2).Infof("request: %v", requests)
-	glog.V(2).Infof("local_metrics: %v", localMetrics)
+	glog.V(3).Infof("request: %v", requests)
+	glog.V(3).Infof("local_metrics: %v", localMetrics)
 	
 	utilization := make(map[string]int64, itemsLen)
 	for podName, requestValue := range requests {
@@ -326,7 +330,7 @@ func (s *ServiceCollector)collect()error{
 			utilization[podName] = res[podName] * 100 / requestValue
 		}
 	}
-	glog.V(2).Infof("utilization: %v", utilization)
+	glog.V(3).Infof("utilization: %v", utilization)
 	s.sendUtilizations(utilization, pods)
 	
 	deployments, err := s.dStore.List()
