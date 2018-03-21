@@ -9,8 +9,6 @@ const (
 	FastTenantIdLabel			 = "tenant.id"
 )
 
-type PodMetricsInfo map[string]int64
-
 func GetContainerName(labels map[string]string) string {
 	return labels[KubernetesContainerNameLabel]
 }

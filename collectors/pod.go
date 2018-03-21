@@ -9,7 +9,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/apimachinery/pkg/fields"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	
+	//podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
+
+type PodMetricsInfo map[string]int64
 
 type PodLister func() ([]v1.Pod, error)
 func (l PodLister) List() ([]v1.Pod, error) {
@@ -80,4 +85,63 @@ func (s *ServiceCollector)podRequestSum(pod v1.Pod)int64 {
 		}
 	}
 	return podSum
+}
+
+func (s *ServiceCollector)getPodMetrics()(PodMetricsInfo, error){
+	metrics, err := s.mClient.PodMetricses(metav1.NamespaceAll).List(metav1.ListOptions{})
+	if err != nil {
+		glog.Errorf("get PodMetricses failed %v", err)
+		return nil, err
+	}
+	glog.V(5).Infof("metrics %#v", metrics)	
+	res := make(PodMetricsInfo, len(metrics.Items))
+	for _, m := range metrics.Items {
+		podSum := int64(0)
+		missing := len(m.Containers) == 0
+		for _, c := range m.Containers {
+			resValue, found := c.Usage[v1.ResourceName("memory")]
+			if !found {
+				missing = true
+				glog.V(2).Infof("missing resource metric memory for container %s in pod %s/%s", c.Name, metav1.NamespaceAll, m.Name)
+				break // containers loop
+			}
+			podSum += resValue.Value()
+		}
+		if !missing {
+			res[m.Name] = int64(podSum)
+		}
+	}
+	return res, err
+}
+
+// IsPodReady returns true if a pod is ready; false otherwise.
+func IsPodReady(pod *v1.Pod) bool {
+	return IsPodReadyConditionTrue(pod.Status)
+}
+
+// IsPodReady retruns true if a pod is ready; false otherwise.
+func IsPodReadyConditionTrue(status v1.PodStatus) bool {
+	condition := GetPodReadyCondition(status)
+	return condition != nil && condition.Status == v1.ConditionTrue
+}
+
+// Extracts the pod ready condition from the given status and returns that.
+// Returns nil if the condition is not present.
+func GetPodReadyCondition(status v1.PodStatus) *v1.PodCondition {
+	_, condition := GetPodCondition(&status, v1.PodReady)
+	return condition
+}
+
+// GetPodCondition extracts the provided condition from the given status and returns that.
+// Returns nil and -1 if the condition is not present, and the index of the located condition.
+func GetPodCondition(status *v1.PodStatus, conditionType v1.PodConditionType) (int, *v1.PodCondition) {
+	if status == nil {
+		return -1, nil
+	}
+	for i := range status.Conditions {
+		if status.Conditions[i].Type == conditionType {
+			return i, &status.Conditions[i]
+		}
+	}
+	return -1, nil
 }

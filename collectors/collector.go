@@ -284,27 +284,11 @@ func (s *ServiceCollector)waitUtilization(){
 
 func (s *ServiceCollector)collect()error{
 	glog.V(3).Infof("Collect at %v\n", time.Now())
-	metrics, err := s.mClient.PodMetricses(metav1.NamespaceAll).List(metav1.ListOptions{})
-	glog.V(5).Infof("metrics %#v", metrics)	
-	res := make(PodMetricsInfo, len(metrics.Items))
-	for _, m := range metrics.Items {
-		podSum := int64(0)
-		missing := len(m.Containers) == 0
-		for _, c := range m.Containers {
-			resValue, found := c.Usage[v1.ResourceName("memory")]
-			if !found {
-				missing = true
-				glog.V(2).Infof("missing resource metric memory for container %s in pod %s/%s", c.Name, metav1.NamespaceAll, m.Name)
-				break // containers loop
-			}
-			podSum += resValue.Value()
-		}
-		if !missing {
-			res[m.Name] = int64(podSum)
-		}
+	res, err := s.getPodMetrics()
+	if err != nil {
+		return err
 	}
 	glog.V(2).Infof("PodMetricsInfo: %#v", res)
-	
 	
 	containers, err := s.cManager.SubcontainersInfo("/", &cinfo.ContainerInfoRequest{NumStats: 1})
 	if err != nil {
@@ -321,6 +305,10 @@ func (s *ServiceCollector)collect()error{
 	} else {
 		for _, pod := range pods {
 			s.displayPod(pod)
+			if pod.Status.Phase != v1.PodRunning || !IsPodReady(&pod) {
+				glog.V(2).Infof("pod %s unready, skip.", pod.Name)
+				continue
+			}
 			podMetricsSum := s.podMetricsSum(pod, containers)
 			podRequestSum := s.podRequestSum(pod)
 			requests[pod.Name] = podRequestSum
@@ -339,7 +327,7 @@ func (s *ServiceCollector)collect()error{
 		}
 	}
 	glog.V(2).Infof("utilization: %v", utilization)
-	s.sendUtilizations(utilization)
+	s.sendUtilizations(utilization, pods)
 	
 	deployments, err := s.dStore.List()
 	if err != nil {
@@ -394,19 +382,19 @@ func (s *ServiceCollector) collectorList() []prometheus.Collector {
 	return cl
 }
 
-func (s *ServiceCollector)sendUtilizations(util map[string]int64){
+func (s *ServiceCollector)sendUtilizations(util map[string]int64, pods []v1.Pod){
 	var uinfo = UtilizInfo{
 		resource : resourceMemory,
 	}
-	pods, _ := s.pStore.List()
 	for _, pod := range pods {
 		uinfo.podname = pod.Name
 		uinfo.namespace = pod.Namespace
 		uinfo.tenantid = pod.Labels[FastTenantIdLabel]
-		if pod.Status.Phase == "Failed" || pod.Status.Phase == "Unknown" {
+		value, ok := util[uinfo.podname]
+		if !ok {
 			uinfo.value = -1
 		} else {
-			uinfo.value = float64(util[uinfo.podname])
+			uinfo.value = float64(value)
 		}
 		s.util<-uinfo
 	}
