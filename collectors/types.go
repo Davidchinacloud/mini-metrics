@@ -5,6 +5,8 @@ const (
 	KubernetesPodNamespaceLabel  = "io.kubernetes.pod.namespace"
 	KubernetesPodUIDLabel        = "io.kubernetes.pod.uid"
 	KubernetesContainerNameLabel = "io.kubernetes.container.name"
+	
+	FastTenantIdLabel			 = "tenant.id"
 )
 
 type PodMetricsInfo map[string]int64

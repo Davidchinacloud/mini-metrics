@@ -50,10 +50,11 @@ type StatusInfo struct {
 }
 
 type UtilizInfo struct {
-	resource int
-	namespace string
-	podname   string
-	value float64
+	resource 	int
+	namespace 	string
+	podname   	string
+	tenantid  	string
+	value 		float64
 }
 
 type PodInfo struct {
@@ -158,7 +159,7 @@ func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore,
 				Help:        "POD MEMORY UTILIZATION",
 				ConstLabels: labels,
 			},
-			[]string{"pod_name", "namespace"},
+			[]string{"pod_name", "namespace", "tenantId"},
 		),
 		},
 		pStore: ps,
@@ -269,7 +270,7 @@ func (s *ServiceCollector)waitUtilization(){
 				s.mu.Lock()
 				for k, status := range s.fastResourceUtil {
 					if k == recv.resource {
-						status.WithLabelValues(recv.podname, recv.namespace).Set(recv.value)
+						status.WithLabelValues(recv.podname, recv.namespace, recv.tenantid).Set(recv.value)
 						break
 					}
 				}
@@ -338,16 +339,8 @@ func (s *ServiceCollector)collect()error{
 		}
 	}
 	glog.V(2).Infof("utilization: %v", utilization)
-	var uinfo = UtilizInfo{
-		resource : resourceMemory,
-	}
-	for podName, util := range utilization{
-		uinfo.podname = podName
-		uinfo.namespace = "default"
-		uinfo.value = float64(util)
-		s.util<-uinfo
-	}
-
+	s.sendUtilizations(utilization)
+	
 	deployments, err := s.dStore.List()
 	if err != nil {
 		glog.Errorf("listing deployment failed: %s", err)
@@ -399,6 +392,24 @@ func (s *ServiceCollector) collectorList() []prometheus.Collector {
 		cl = append(cl, metrics)
 	}
 	return cl
+}
+
+func (s *ServiceCollector)sendUtilizations(util map[string]int64){
+	var uinfo = UtilizInfo{
+		resource : resourceMemory,
+	}
+	pods, _ := s.pStore.List()
+	for _, pod := range pods {
+		uinfo.podname = pod.Name
+		uinfo.namespace = pod.Namespace
+		uinfo.tenantid = pod.Labels[FastTenantIdLabel]
+		if pod.Status.Phase == "Failed" || pod.Status.Phase == "Unknown" {
+			uinfo.value = -1
+		} else {
+			uinfo.value = float64(util[uinfo.podname])
+		}
+		s.util<-uinfo
+	}
 }
 
 func boolFloat64(b bool)float64{
