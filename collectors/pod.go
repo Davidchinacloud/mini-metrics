@@ -14,7 +14,7 @@ import (
 	//podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
-type PodMetricsInfo map[string]int64
+type PodMetricsInfo map[string]float64
 
 type PodLister func() ([]v1.Pod, error)
 func (l PodLister) List() ([]v1.Pod, error) {
@@ -74,12 +74,12 @@ func (s *ServiceCollector)displayPod(pod v1.Pod){
 	glog.V(3).Infof("*****************************")
 }
 
-func (s *ServiceCollector)podRequestSum(pod v1.Pod)int64 {
-	var podSum int64
+func (s *ServiceCollector)podRequestSum(pod v1.Pod)float64 {
+	var podSum float64
 	for _, container := range pod.Spec.Containers {
 		if containerRequest, ok := container.Resources.Requests["memory"]; ok {
 			//podSum += containerRequest.MilliValue()
-			podSum += containerRequest.Value()
+			podSum += float64(containerRequest.Value())
 		} else {
 			return -1
 		}
@@ -96,7 +96,7 @@ func (s *ServiceCollector)getPodMetrics()(PodMetricsInfo, error){
 	glog.V(5).Infof("metrics %#v", metrics)	
 	res := make(PodMetricsInfo, len(metrics.Items))
 	for _, m := range metrics.Items {
-		podSum := int64(0)
+		podSum := float64(0)
 		missing := len(m.Containers) == 0
 		for _, c := range m.Containers {
 			resValue, found := c.Usage[v1.ResourceName("memory")]
@@ -105,10 +105,10 @@ func (s *ServiceCollector)getPodMetrics()(PodMetricsInfo, error){
 				glog.V(2).Infof("missing resource metric memory for container %s in pod %s/%s", c.Name, metav1.NamespaceAll, m.Name)
 				break // containers loop
 			}
-			podSum += resValue.Value()
+			podSum += float64(resValue.Value())
 		}
 		if !missing {
-			res[m.Name] = int64(podSum)
+			res[m.Name] = podSum
 		}
 	}
 	return res, err

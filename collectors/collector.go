@@ -301,7 +301,7 @@ func (s *ServiceCollector)collect()error{
 		return err
 	}
 	itemsLen := len(pods)
-	requests := make(map[string]int64, itemsLen)
+	requests := make(map[string]float64, itemsLen)
 	localMetrics := make(map[string]int64, itemsLen)
 	if err != nil {
 		glog.Errorf("listing pods failed: %s", err)
@@ -322,7 +322,7 @@ func (s *ServiceCollector)collect()error{
 	glog.V(3).Infof("request: %v", requests)
 	glog.V(3).Infof("local_metrics: %v", localMetrics)
 	
-	utilization := make(map[string]int64, itemsLen)
+	utilization := make(map[string]float64, itemsLen)
 	for podName, requestValue := range requests {
 		if requestValue <= 0 {
 			utilization[podName] = -1
@@ -386,7 +386,7 @@ func (s *ServiceCollector) collectorList() []prometheus.Collector {
 	return cl
 }
 
-func (s *ServiceCollector)sendUtilizations(util map[string]int64, pods []v1.Pod){
+func (s *ServiceCollector)sendUtilizations(util map[string]float64, pods []v1.Pod){
 	var uinfo = UtilizInfo{
 		resource : resourceMemory,
 	}
@@ -398,7 +398,7 @@ func (s *ServiceCollector)sendUtilizations(util map[string]int64, pods []v1.Pod)
 		if !ok {
 			uinfo.value = -1
 		} else {
-			uinfo.value = float64(value)
+			uinfo.value = value
 		}
 		s.util<-uinfo
 	}
