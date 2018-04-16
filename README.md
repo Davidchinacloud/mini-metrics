@@ -41,6 +41,9 @@ run cmd:
 # How to build
 ```
 git clone git@github.com:sak0/mini-metrics.git
-CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"'
+
+yum install glibc-static
+
+CGO_ENABLED=1 GOOS=linux go build -a -ldflags '-extldflags "-static"'
 docker build .
 ```
