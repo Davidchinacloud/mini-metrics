@@ -18,5 +18,5 @@ func (s *ServiceCollector)podMetricsSum(pod v1.Pod, containers []*cinfo.Containe
 			metricsSum += int64(c.Stats[0].Memory.Usage)
 		}
 	}
-	return metricsSum/1024/1024
+	return metricsSum
 }

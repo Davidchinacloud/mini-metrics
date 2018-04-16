@@ -15,6 +15,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/client-go/kubernetes"
+	//api "k8s.io/kubernetes/pkg/apis/core"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	resourceclient "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1"
 	
@@ -54,6 +55,7 @@ type UtilizInfo struct {
 	namespace 	string
 	podname   	string
 	tenantid  	string
+	servicename string
 	value 		float64
 }
 
@@ -101,7 +103,9 @@ func RegisterServiceCollector(kubeClient kubernetes.Interface, metricsClient *re
 	prometheus.Register(sc)
 	
 	// just test k8s-client
-	testNodeListUpdate(kubeClient)
+	//testNodeListUpdate(kubeClient)
+	//testQuotaListUpdate(kubeClient, namespace)
+	
 	
 	//TODO: need close goroutine such as signalKillHandle..
 	go sc.waitStatus()
@@ -159,7 +163,7 @@ func newServiceCollector(ps podStore, ds deploymentStore, rs replicasetStore,
 				Help:        "POD MEMORY UTILIZATION",
 				ConstLabels: labels,
 			},
-			[]string{"pod_name", "namespace", "tenantId"},
+			[]string{"pod_name", "namespace", "tenantId", "service_name"},
 		),
 		},
 		pStore: ps,
@@ -270,7 +274,7 @@ func (s *ServiceCollector)waitUtilization(){
 				s.mu.Lock()
 				for k, status := range s.fastResourceUtil {
 					if k == recv.resource {
-						status.WithLabelValues(recv.podname, recv.namespace, recv.tenantid).Set(recv.value)
+						status.WithLabelValues(recv.podname, recv.namespace, recv.tenantid, recv.servicename).Set(recv.value)
 						break
 					}
 				}
@@ -331,7 +335,9 @@ func (s *ServiceCollector)collect()error{
 		}
 	}
 	glog.V(3).Infof("utilization: %v", utilization)
-	s.sendUtilizations(utilization, pods)
+	maps := make(map[string]string, itemsLen)
+	maps = s.getPodDeploymentMap(pods)
+	s.sendUtilizations(utilization, pods, maps)
 	
 	deployments, err := s.dStore.List()
 	if err != nil {
@@ -386,7 +392,7 @@ func (s *ServiceCollector) collectorList() []prometheus.Collector {
 	return cl
 }
 
-func (s *ServiceCollector)sendUtilizations(util map[string]float64, pods []v1.Pod){
+func (s *ServiceCollector)sendUtilizations(util map[string]float64, pods []v1.Pod, podmap map[string]string){
 	var uinfo = UtilizInfo{
 		resource : resourceMemory,
 	}
@@ -394,6 +400,7 @@ func (s *ServiceCollector)sendUtilizations(util map[string]float64, pods []v1.Po
 		uinfo.podname = pod.Name
 		uinfo.namespace = pod.Namespace
 		uinfo.tenantid = pod.Labels[FastTenantIdLabel]
+		uinfo.servicename = podmap[uinfo.podname]
 		value, ok := util[uinfo.podname]
 		if !ok {
 			uinfo.value = -1
@@ -427,4 +434,50 @@ func testNodeListUpdate(kubeClient kubernetes.Interface){
 			glog.Errorf("Update node failed: %v", err)
 		}
 	}
+}
+
+func testQuotaListUpdate(kubeClient kubernetes.Interface, namespace string) {
+	pods, err := kubeClient.Core().Pods(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		glog.Errorf("List Pods failed: %v", err)
+		return
+	}
+	requests := v1.ResourceList{}
+	if len(pods.Items) > 0 {
+		for _, pod := range pods.Items{
+			for i := range pod.Spec.Containers {
+				requests = QuotaAdd(requests, pod.Spec.Containers[i].Resources.Requests)
+			}
+			glog.V(5).Infof("[pod]-%s requst: %+v", pod.Name, requests)
+		}
+	}
+	glog.V(3).Infof("requst memory: %#v", requests["memory"])
+	glog.V(3).Infof("requst cpu: %#v", requests["cpu"])
+	quotas, err := kubeClient.Core().ResourceQuotas(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		glog.Errorf("List ResourceQuotas failed: %v", err)
+		return
+	}
+	
+	//newQuota := v1.ResourceQuota{}
+	if len(quotas.Items) == 0 {
+		return
+	}
+	for _, quota := range quotas.Items {
+		glog.V(3).Infof("[quota]-%s use: %+v", quota.Name, quota.Status.Used)
+		glog.V(3).Infof("[quota]-%s hard: %+v", quota.Name, quota.Status.Hard)
+		glog.V(3).Infof("[quota]-%s hardMemory: %+v", quota.Name, quota.Spec.Hard["limits.memory"])
+		glog.V(3).Infof("[quota]-%s usedMemory: %+v", quota.Name, quota.Status.Used["limits.memory"])
+		glog.V(3).Infof("[quota]-%s usedMemoryValue: %#v", quota.Name, quota.Status.Used["limits.memory"])
+		newQuota := quota
+		newQuota.Status.Used["limits.memory"] = requests["memory"]
+		 _, err = kubeClient.Core().ResourceQuotas(quota.Namespace).UpdateStatus(&newQuota)
+		 if err != nil {
+			 glog.Errorf("Update resource failed: %v", err)
+		 }
+		
+		glog.V(3).Infof("[quota]NewQuota: %+v", newQuota)
+	}
+	
+ 
 }

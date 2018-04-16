@@ -114,6 +114,31 @@ func (s *ServiceCollector)getPodMetrics()(PodMetricsInfo, error){
 	return res, err
 }
 
+func (s *ServiceCollector)getPodDeploymentMap(pods []v1.Pod)map[string]string {
+	getDpName := func(s string)string{
+		var last int
+		rs := []rune(s)
+		for k, r := range rs {
+			if r == '-' {
+				last = k
+			}
+		}
+		return string(rs[:last])
+	}
+	
+	podmap := make(map[string]string, len(pods))
+	for _, pod := range pods {
+		owners := pod.GetOwnerReferences()
+		if len(owners) > 0 && owners[0].Kind == "ReplicaSet" {
+			rsName := owners[0].Name
+			podmap[pod.Name] = getDpName(rsName)
+			continue
+		}
+		podmap[pod.Name] = ""
+	}
+	return podmap
+}
+
 // IsPodReady returns true if a pod is ready; false otherwise.
 func IsPodReady(pod *v1.Pod) bool {
 	return IsPodReadyConditionTrue(pod.Status)
