@@ -9,7 +9,7 @@ import (
 	"github.com/google/cadvisor/cache/memory"
 	cmanager "github.com/google/cadvisor/manager"
 	cadvisormetrics "github.com/google/cadvisor/container"
-	cinfo "github.com/google/cadvisor/info/v1"
+	//cinfo "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/utils/sysfs"
 	
 	"k8s.io/api/core/v1"
@@ -294,7 +294,7 @@ func (s *ServiceCollector)collect()error{
 	}
 	glog.V(3).Infof("PodMetricsInfo: %#v", res)
 	
-	containers, err := s.cManager.SubcontainersInfo("/", &cinfo.ContainerInfoRequest{NumStats: 1})
+	//containers, err := s.cManager.SubcontainersInfo("/", &cinfo.ContainerInfoRequest{NumStats: 1})
 	if err != nil {
 		glog.Errorf("SubcontainersInfo Failed: %v", err)
 		return err
@@ -306,7 +306,7 @@ func (s *ServiceCollector)collect()error{
 	}
 	itemsLen := len(pods)
 	requests := make(map[string]float64, itemsLen)
-	localMetrics := make(map[string]int64, itemsLen)
+	//localMetrics := make(map[string]int64, itemsLen)
 	if err != nil {
 		glog.Errorf("listing pods failed: %s", err)
 		return err
@@ -317,14 +317,14 @@ func (s *ServiceCollector)collect()error{
 				glog.V(2).Infof("pod %s unready, skip.", pod.Name)
 				continue
 			}
-			podMetricsSum := s.podMetricsSum(pod, containers)
+			//podMetricsSum := s.podMetricsSum(pod, containers)
 			podRequestSum := s.podRequestSum(pod)
 			requests[pod.Name] = podRequestSum
-			localMetrics[pod.Name] = podMetricsSum
+			//localMetrics[pod.Name] = podMetricsSum
 		}
 	}
 	glog.V(3).Infof("request: %v", requests)
-	glog.V(3).Infof("local_metrics: %v", localMetrics)
+	//glog.V(3).Infof("local_metrics: %v", localMetrics)
 	
 	utilization := make(map[string]float64, itemsLen)
 	for podName, requestValue := range requests {
